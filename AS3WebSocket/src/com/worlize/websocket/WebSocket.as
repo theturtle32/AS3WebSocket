@@ -1,6 +1,10 @@
 package com.worlize.websocket
 {
 	import com.adobe.crypto.SHA1;
+	import com.wirelust.as3zlib.Deflate;
+	import com.wirelust.as3zlib.Inflate;
+	import com.wirelust.as3zlib.JZlib;
+	import com.wirelust.as3zlib.ZStream;
 	
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -12,8 +16,10 @@ package com.worlize.websocket
 	import flash.net.Socket;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
+	import flash.utils.IDataInput;
 	import flash.utils.Timer;
 	
+	import mx.core.IDataRenderer;
 	import mx.utils.Base64Encoder;
 	import mx.utils.URLUtil;
 	
@@ -51,6 +57,15 @@ package com.worlize.websocket
 		private var waitingForServerClose:Boolean = false;
 		private var closeTimeout:int = 5000;
 		private var closeTimer:Timer;
+		
+		private var deflateStream:Boolean = false;
+		private var zstreamOut:ZStream;
+		private var zstreamIn:ZStream;
+		
+		private var incomingBuffer:ByteArray;
+		private var outgoingBuffer:ByteArray;
+		
+		public var enableDeflateStream:Boolean = true;
 		
 		public static var debug:Boolean = true;
 		
@@ -197,7 +212,9 @@ package com.worlize.websocket
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.TEXT_FRAME;
 			frame.utf8Payload = data;
-			frame.send(socket);
+			var buffer:ByteArray = new ByteArray();
+			frame.send(buffer);
+			sendData(buffer);
 		}
 		
 		public function sendBytes(data:ByteArray):void {
@@ -206,7 +223,9 @@ package com.worlize.websocket
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.BINARY_FRAME;
 			frame.binaryPayload = data;
-			frame.send(socket);
+			var buffer:ByteArray = new ByteArray();
+			frame.send(buffer);
+			sendData(buffer);
 		}
 		
 		public function ping():void {
@@ -214,7 +233,9 @@ package com.worlize.websocket
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PING;
-			frame.send(socket);
+			var buffer:ByteArray = new ByteArray();
+			frame.send(buffer);
+			sendData(buffer);
 		}
 		
 		public function pong():void {
@@ -222,7 +243,33 @@ package com.worlize.websocket
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PONG;
-			frame.send(socket);
+			var buffer:ByteArray = new ByteArray();
+			frame.send(buffer);
+			sendData(buffer);
+		}
+		
+		private function sendData(data:ByteArray, fullFlush:Boolean = false):void {
+			data.position = 0;
+			if (deflateStream) {
+				zstreamOut.next_in = data;
+				zstreamOut.avail_in = data.bytesAvailable;
+				zstreamOut.next_in_index = 0;
+				zstreamOut.next_out = new ByteArray();
+				zstreamOut.next_out_index = 0;
+				zstreamOut.total_out = zstreamOut.avail_out = 0x7FFFFFFF;
+				var err:int = zstreamOut.deflate(fullFlush ? JZlib.Z_FULL_FLUSH : JZlib.Z_PARTIAL_FLUSH);
+				if (err === JZlib.Z_STREAM_ERROR) {
+					throw new Error("Zlib error deflate: " + err);
+				}
+				zstreamOut.next_out.position = 0;
+				socket.writeBytes(zstreamOut.next_out, 0, zstreamOut.next_out.length);
+				zstreamOut.next_in.clear();
+				zstreamOut.next_out.clear();
+			}
+			else {
+				socket.writeBytes(data, 0, data.bytesAvailable);
+				data.clear();
+			}
 		}
 		
 		public function close(waitForServer:Boolean = true):void {
@@ -232,7 +279,9 @@ package com.worlize.websocket
 				frame.fin = true;
 				frame.opcode = WebSocketOpcode.CONNECTION_CLOSE;
 				frame.closeStatus = WebSocketCloseStatus.NORMAL;
-				frame.send(socket);
+				var buffer:ByteArray = new ByteArray();
+				frame.send(buffer);
+				sendData(buffer, true);
 				
 				if (waitForServer) {
 					waitingForServerClose = true;
@@ -250,6 +299,7 @@ package com.worlize.websocket
 				// connection, so we'll just close it.
 				if (socket.connected) {
 					socket.close();
+					destructDeflateStream();
 				}
 			}
 		}
@@ -274,12 +324,52 @@ package com.worlize.websocket
 				return;
 			}
 
-			// addData returns true if the frame is complete, or false
+			if (socket.connected && socket.bytesAvailable > 0) {
+				if (deflateStream) {
+					zstreamIn.next_in = new ByteArray();
+					zstreamIn.avail_in = socket.bytesAvailable;
+					zstreamIn.next_in_index = 0;
+					socket.readBytes(zstreamIn.next_in, 0, socket.bytesAvailable);
+					zstreamIn.next_out = new ByteArray();
+					zstreamIn.next_out_index = 0;
+					zstreamIn.avail_out = 0x7FFFFFFF;
+					var err:int = zstreamIn.inflate(JZlib.Z_SYNC_FLUSH);
+					if (err === JZlib.Z_NEED_DICT ||
+						err === JZlib.Z_DATA_ERROR ||
+					 	err === JZlib.Z_MEM_ERROR) {
+						throw new Error("Zlib error inflate: " + err);
+					}
+					zstreamIn.next_out.position = 0;
+					zstreamIn.next_out.readBytes(incomingBuffer, incomingBuffer.position, zstreamIn.next_out.bytesAvailable);
+					zstreamIn.next_in.clear();
+					zstreamIn.next_out.clear();
+				}
+				else {
+					socket.readBytes(incomingBuffer, incomingBuffer.position, socket.bytesAvailable);
+				}
+			}
+
+			// addData returns true if the frame is complete, and false
 			// if more data is needed.
-			while (socket.connected && currentFrame.addData(socket)) {
+			while (currentFrame.addData(incomingBuffer)) {
 				processFrame(currentFrame);
 				currentFrame = new WebSocketFrame();
 			}
+			
+			if (incomingBuffer.bytesAvailable > 0) {
+				// If there is still unused data left in the buffer, delete
+				// the used data and reset the buffer to contain only the
+				// new, unused data.
+				var tempBuffer:ByteArray = new ByteArray();
+				incomingBuffer.readBytes(tempBuffer, 0, incomingBuffer.bytesAvailable);
+				incomingBuffer.clear();
+				tempBuffer.readBytes(incomingBuffer, 0, tempBuffer.bytesAvailable);
+				tempBuffer.clear();
+			}
+			else {
+				incomingBuffer.clear();
+			}
+			
 		}
 		
 		private function processFrame(frame:WebSocketFrame):void {
@@ -287,47 +377,51 @@ package com.worlize.websocket
 			// frameQueue.push(frame);
 			var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.MESSAGE);
 
-			if (frame.opcode === WebSocketOpcode.BINARY_FRAME) {
-				event.message = new WebSocketMessage();
-				event.message.type = WebSocketMessage.TYPE_BINARY;
-				event.message.binaryData = frame.binaryPayload;
-				dispatchEvent(event);
-			}
-
-			else if (frame.opcode === WebSocketOpcode.TEXT_FRAME) {
-				event.message = new WebSocketMessage();
-				event.message.type = WebSocketMessage.TYPE_UTF8;
-				event.message.utf8Data = frame.utf8Payload;
-				dispatchEvent(event);
-			}
-			
-			else if (frame.opcode === WebSocketOpcode.PING) {
-				if (debug) {
-					trace("Received Ping");
-				}
-				pong();
-			}
-			
-			else if (frame.opcode === WebSocketOpcode.PONG) {
-				if (debug) {
-					trace("Received Pong");
-				}
-			}
-			
-			else if (frame.opcode === WebSocketOpcode.CONNECTION_CLOSE) {
-				if (debug) {
-					trace("Received close from server");
-				}
-				if (waitingForServerClose) {
-					// got confirmation from server, finish closing connection
-					closeTimer.stop();
-					waitingForServerClose = false;
-					socket.close();
-				}
-				else {
-					close(false);
-					dispatchClosedEvent();
-				}
+			switch (frame.opcode) {
+				case WebSocketOpcode.BINARY_FRAME:
+					event.message = new WebSocketMessage();
+					event.message.type = WebSocketMessage.TYPE_BINARY;
+					event.message.binaryData = frame.binaryPayload;
+					dispatchEvent(event);
+					break;
+				case WebSocketOpcode.TEXT_FRAME:
+					event.message = new WebSocketMessage();
+					event.message.type = WebSocketMessage.TYPE_UTF8;
+					event.message.utf8Data = frame.utf8Payload;
+					dispatchEvent(event);
+					break;
+				case WebSocketOpcode.PING:
+					if (debug) {
+						trace("Received Ping");
+					}
+					pong();
+					break;
+				case WebSocketOpcode.PONG:
+					if (debug) {
+						trace("Received Pong");
+					}
+					break;
+				case WebSocketOpcode.CONNECTION_CLOSE:
+					if (debug) {
+						trace("Received close from server");
+					}
+					if (waitingForServerClose) {
+						// got confirmation from server, finish closing connection
+						closeTimer.stop();
+						waitingForServerClose = false;
+						socket.close();
+						destructDeflateStream();
+					}
+					else {
+						close(false);
+						dispatchClosedEvent();
+					}
+					break;
+				default:
+					if (debug) {
+						trace("Unrecognized Opcode: 0x" + frame.opcode.toString(16));
+					}
+					break;
 			}
 		}
 		
@@ -360,8 +454,10 @@ package com.worlize.websocket
 				text += "Sec-WebSocket-Protocol: " + protocol + "\r\n";
 			}
 			// TODO: Handle Extensions
-//			var extension:String = "deflate-stream";
-//			text += "Sec-WebSocket-Extensions: " + extension + "\r\n";
+			if (enableDeflateStream) {
+				var extension:String = "deflate-stream";
+				text += "Sec-WebSocket-Extensions: " + extension + "\r\n";
+			}
 			text += "\r\n";
 			
 			if (debug) {
@@ -411,7 +507,7 @@ package com.worlize.websocket
 						
 						while (lines.length > 0) {
 							responseLine = lines.shift();
-							var header:Array = responseLine.split(/\:\s*/);
+							var header:Array = responseLine.split(/\: */);
 							var name:String = header[0];
 							var value:String = header[1];
 							if (name === null || value === null) {
@@ -425,7 +521,7 @@ package com.worlize.websocket
 							else if (lcName === 'connection' && lcValue === 'upgrade') {
 								connectionHeader = true;
 							}
-							else if (lcName === 'sec-websocket-extension' && value) {
+							else if (lcName === 'sec-websocket-extensions' && value) {
 								var extensionsThisLine:Array = value.split(',');
 								serverExtensions = serverExtensions.concat(extensionsThisLine);
 							}
@@ -441,7 +537,7 @@ package com.worlize.websocket
 							trace("UpgradeHeader: " + upgradeHeader);
 							trace("ConnectionHeader: " + connectionHeader);
 							trace("KeyValidated: " + keyValidated);
-							trace("Server Extensions:\n" + serverExtensions.join(' | '));
+							trace("Server Extensions: " + serverExtensions.join(' | '));
 						}
 						if (upgradeHeader && connectionHeader && keyValidated) {
 							// The connection is validated!!
@@ -450,8 +546,18 @@ package com.worlize.websocket
 							_readyState = WebSocketState.OPEN;
 							parseState = PARSE_NEW_FRAME;
 							
+							if (serverExtensions.indexOf('deflate-stream') !== -1) {
+								initDeflateStream();
+							}
+							
 							// prepare for first frame
 							currentFrame = new WebSocketFrame();
+							
+							// Initialize Stream Buffers
+							incomingBuffer = new ByteArray();
+							incomingBuffer.endian = Endian.BIG_ENDIAN;
+							outgoingBuffer = new ByteArray();
+							outgoingBuffer.endian = Endian.BIG_ENDIAN;
 							
 							dispatchEvent(new WebSocketEvent(WebSocketEvent.OPEN));
 							
@@ -487,6 +593,45 @@ package com.worlize.websocket
 				throw new WebSocketError("Not enough bytes to form a line yet.");
 			}
 			return line;
+		}
+		
+		private function initDeflateStream():void {
+			var err:int;
+			// JZlib and subsequently as3zlib only support a minimum window
+			// bits size of 9 for deflate, not 8 like C zlib.  So we'll use
+			// that I guess.
+			var windowBitsOut:int = 9;
+			var windowBitsIn:int = 8;
+			
+			deflateStream = true;
+			zstreamOut = new ZStream();
+			zstreamIn = new ZStream();
+			
+			err = zstreamOut.deflateInitWithIntIntBoolean(JZlib.Z_BEST_SPEED, windowBitsOut, true);
+			if (err !== JZlib.Z_OK) {
+				throw new Error("Error calling deflateInitWithIntIntBoolean() - " + err);
+			}
+			
+			err = zstreamIn.inflateInitWithWbitsNoWrap(windowBitsIn, true);
+			if (err !== JZlib.Z_OK) {
+				throw new Error("Error calling inflateInitWithWbitsNoWrap() - " + err);
+			}
+			
+			if (debug) {
+				trace("ZLib constructed");
+			}
+		}
+		
+		private function destructDeflateStream():void {
+			if (deflateStream) {
+				zstreamIn.inflateEnd();
+				zstreamOut.deflateEnd();
+				zstreamIn = null;
+				zstreamOut = null;
+				if (debug) {
+					trace("ZLib destructed");
+				}
+			}
 		}
 		
 		private function dispatchClosedEvent():void {

@@ -3,7 +3,7 @@
 					   xmlns:s="library://ns.adobe.com/flex/spark" 
 					   xmlns:mx="library://ns.adobe.com/flex/mx"
 					   width="600" height="500"
-					   creationComplete="handleCreationComplete()">
+					   creationComplete="handleCreationComplete()" viewSourceURL="srcview/index.html">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
 	</fx:Declarations>
@@ -42,7 +42,9 @@
 			}
 			
 			private function openConnection():void {
+				connectButton.enabled = false;
 				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value']);
+				websocket.enableDeflateStream = true;
 				websocket.connect();
 				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
 				websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
@@ -57,7 +59,6 @@
 			
 			private function handleWebSocketOpen(event:WebSocketEvent):void {
 				trace("Websocket Connected");
-				connectButton.enabled = false;
 				disconnectButton.enabled = true;
 			}
 			
@@ -75,7 +76,6 @@
 						drawCanvas.graphics.lineTo(endX, endY);
 					}
 					else if (websocket.protocol === 'dumb-increment-protocol') {
-						trace(event.message.utf8Data);
 						dumbIncrementValue = parseInt(event.message.utf8Data, 10);
 					}
 					else {
@@ -139,7 +139,7 @@
 	<s:HGroup verticalAlign="middle"
 			  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
 		<s:Label text="Host" />
-		<s:TextInput text="192.168.0.113" id="host" />
+		<s:TextInput text="192.168.0.106" id="host" />
 		<mx:Spacer width="10" />
 		<s:Label text="Port" />
 		<s:TextInput text="7681" id="port" />

@@ -15,7 +15,9 @@
   </compiler>
   <applications>
     <application path="AS3WebSocket.mxml">
-      <airExcludes/>
+      <airExcludes>
+        <airExclude path=".DS_Store"/>
+      </airExcludes>
     </application>
   </applications>
   <modules/>
