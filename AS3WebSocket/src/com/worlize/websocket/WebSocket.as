@@ -19,8 +19,6 @@ package com.worlize.websocket
 	import flash.utils.IDataInput;
 	import flash.utils.Timer;
 	
-	import mx.core.IDataRenderer;
-	import mx.core.mx_internal;
 	import mx.utils.Base64Encoder;
 	import mx.utils.URLUtil;
 	
