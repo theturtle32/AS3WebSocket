@@ -249,6 +249,7 @@ package com.worlize.websocket
 		}
 		
 		private function sendData(data:ByteArray, fullFlush:Boolean = false):void {
+			if (!connected) { return; }
 			data.position = 0;
 			if (deflateStream) {
 				zstreamOut.next_in = data;
