@@ -12,7 +12,14 @@ The AS3WebSocket directory contains a Flash Builder 4 Library Project that conta
 The testApp directory contains a Flash Builder 4 Air Project that uses the AS3WebSocket library and implements two of the test subprotocols from Andy Green's libwebsockets test server, the dumb-increment-protocol, and the lws-mirror-protocol.  For more detail about the libwebsockets test server, see http://git.warmcat.com/cgi-bin/cgit/libwebsockets
 
 
+Features:
+- Based on -06 draft of the WebSocket protocol
+- Support for deflate-stream extension
+- Test Adobe Air app implements two of the subprotocols supported by Andy Green's libwebsockets-test-server:
+  - dumb-increment-protocol (simple streaming incrementing numbers)
+  - lws-mirror-protocol (shared drawing canvas)
+
 Known Issues:
 - Fragmentation is not yet supported
-- There is no extension mechanism implemented
+- There is no user-provided extension API implemented
 - No wss:// support yet
