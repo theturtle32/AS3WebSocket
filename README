@@ -15,3 +15,4 @@ The testApp directory contains a Flash Builder 4 Air Project that uses the AS3We
 Known Issues:
 - Fragmentation is not yet supported
 - There is no extension mechanism implemented
+- No wss:// support yet
