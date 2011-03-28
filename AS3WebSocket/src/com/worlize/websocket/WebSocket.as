@@ -20,6 +20,7 @@ package com.worlize.websocket
 	import flash.utils.Timer;
 	
 	import mx.core.IDataRenderer;
+	import mx.core.mx_internal;
 	import mx.utils.Base64Encoder;
 	import mx.utils.URLUtil;
 	
@@ -430,13 +431,15 @@ package com.worlize.websocket
 			if (debug) {
 				trace("IO Error: " + event);
 			}
+			dispatchEvent(event.clone());
 			close();
 		}
 		
-		private function handleSocketSecurityError(event:SecurityError):void {
+		private function handleSocketSecurityError(event:SecurityErrorEvent):void {
 			if (debug) {
 				trace("Security Error: " + event);
 			}
+			dispatchEvent(event.clone());
 			close();
 		}
 		

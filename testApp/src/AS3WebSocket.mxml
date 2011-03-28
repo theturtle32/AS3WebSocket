@@ -3,6 +3,7 @@
 					   xmlns:s="library://ns.adobe.com/flex/spark" 
 					   xmlns:mx="library://ns.adobe.com/flex/mx"
 					   width="600" height="500"
+					   closing="handleWindowClosing(event)"
 					   creationComplete="handleCreationComplete()" viewSourceURL="srcview/index.html">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
@@ -38,8 +39,14 @@
 			]);
 			
 			private function handleCreationComplete():void {
-				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value']);
+				websocket = new WebSocket("ws://localhost", "*");
 				loadSettings();
+			}
+			
+			private function handleWindowClosing(event:Event):void {
+				if (websocket.connected) {
+					websocket.close();
+				}
 			}
 			
 			private function loadSettings():void {
@@ -66,12 +73,24 @@
 			private function openConnection():void {
 				saveSettings();
 				connectButton.enabled = false;
-				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value']);
+				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value'], 5000);
 				websocket.enableDeflateStream = enableDeflateStreamCheckBox.selected;
 				websocket.connect();
 				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
 				websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
 				websocket.addEventListener(WebSocketEvent.MESSAGE, handleWebSocketMessage);
+				websocket.addEventListener(IOErrorEvent.IO_ERROR, handleIOError);
+				websocket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSecurityError);
+			}
+			
+			private function handleIOError(event:IOErrorEvent):void {
+				connectButton.enabled = true;
+				disconnectButton.enabled = false;
+			}
+			
+			private function handleSecurityError(event:SecurityErrorEvent):void {
+				connectButton.enabled = true;
+				disconnectButton.enabled = false;
 			}
 			
 			private function handleWebSocketClosed(event:WebSocketEvent):void {
