@@ -39,12 +39,35 @@
 			
 			private function handleCreationComplete():void {
 				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value']);
+				loadSettings();
+			}
+			
+			private function loadSettings():void {
+				var sharedObject:SharedObject = SharedObject.getLocal('settings');
+				host.text = sharedObject.data.host || 'localhost';
+				port.text = sharedObject.data.port || '7681';
+				if ('enableDeflateStream' in sharedObject.data) {
+					enableDeflateStreamCheckBox.selected = sharedObject.data.enableDeflateStream;
+				}
+				if ('subprotocolIndex' in sharedObject.data) {
+					protocolSelector.selectedIndex = sharedObject.data.subprotocolIndex;
+				}
+			}
+			
+			private function saveSettings():void {
+				var sharedObject:SharedObject = SharedObject.getLocal('settings');
+				sharedObject.data.host = host.text;
+				sharedObject.data.port = port.text;
+				sharedObject.data.enableDeflateStream = enableDeflateStreamCheckBox.selected;
+				sharedObject.data.subprotocolIndex = protocolSelector.selectedIndex;
+				sharedObject.flush();
 			}
 			
 			private function openConnection():void {
+				saveSettings();
 				connectButton.enabled = false;
 				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value']);
-				websocket.enableDeflateStream = true;
+				websocket.enableDeflateStream = enableDeflateStreamCheckBox.selected;
 				websocket.connect();
 				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
 				websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
@@ -104,7 +127,7 @@
 			}
 			
 			private function handleMouseMove(event:MouseEvent):void {
-				if (drawing) {
+				if (drawing && websocket.connected && websocket.protocol === 'lws-mirror-protocol') {
 					var sx:int = startMouseX;
 					var sy:int = startMouseY;
 					var ex:int = startMouseX = drawCanvas.mouseX;
@@ -139,7 +162,7 @@
 	<s:HGroup verticalAlign="middle"
 			  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
 		<s:Label text="Host" />
-		<s:TextInput text="192.168.0.106" id="host" />
+		<s:TextInput id="host" />
 		<mx:Spacer width="10" />
 		<s:Label text="Port" />
 		<s:TextInput text="7681" id="port" />
@@ -147,6 +170,7 @@
 	</s:HGroup>
 	<s:HGroup verticalAlign="middle"
 			  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
+		<s:CheckBox label="Enable deflate-stream" id="enableDeflateStreamCheckBox" selected="true" />
 		<s:Button id="disconnectButton" enabled="false" label="Disconnect" click="closeConnection();" />
 		<s:Button id="connectButton" label="Connect" click="openConnection();" />
 	</s:HGroup>
