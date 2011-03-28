@@ -122,7 +122,6 @@
 					if (websocket.protocol === 'lws-mirror-protocol') {
 						var fields:Array = event.message.utf8Data.split(' ');
 						var command:String = fields[0];
-						trace("Command: '" + command + "'");
 						var color:uint = parseInt(String(fields[1]).slice(1), 16);
 						var startX:int = parseInt(fields[2], 10);
 						var startY:int = parseInt(fields[3], 10);
