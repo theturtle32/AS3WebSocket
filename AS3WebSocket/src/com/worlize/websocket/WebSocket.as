@@ -603,7 +603,8 @@ package com.worlize.websocket
 			var err:int;
 			// JZlib and subsequently as3zlib only support a minimum window
 			// bits size of 9 for deflate, not 8 like C zlib.  So we'll use
-			// that I guess.
+			// that I guess.  Had initially planned to use 8 because that's
+			// the value that Andy Green's libwebsockets C library uses.
 			var windowBitsOut:int = 9;
 			var windowBitsIn:int = 8;
 			
