@@ -23,6 +23,7 @@ Known Issues:
 - Fragmentation is not yet supported
 - There is no user-provided extension API implemented
 - No wss:// support yet
+- Only the libwebsocket-test-server subprotocols mentioned have been tested so far
 
 
 Usage Example:
