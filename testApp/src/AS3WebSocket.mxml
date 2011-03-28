@@ -2,7 +2,7 @@
 <s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
 					   xmlns:s="library://ns.adobe.com/flex/spark" 
 					   xmlns:mx="library://ns.adobe.com/flex/mx"
-					   width="600" height="500"
+					   width="1000" height="500"
 					   closing="handleWindowClosing(event)"
 					   creationComplete="handleCreationComplete()" viewSourceURL="srcview/index.html">
 	<fx:Declarations>
@@ -38,9 +38,22 @@
 				}
 			]);
 			
+			private var log:String = "";
+			
 			private function handleCreationComplete():void {
 				websocket = new WebSocket("ws://localhost", "*");
 				loadSettings();
+				var scrollToBottomTimer:Number = NaN;
+				WebSocket.logger = function(text:String):void {
+					log += (text + "\n");
+					logOutput.text = log + "\n";
+					if (isNaN(scrollToBottomTimer)) {
+						scrollToBottomTimer = setTimeout(function():void {
+							logOutput.scroller.verticalScrollBar.value = logOutput.scroller.verticalScrollBar.maximum;
+							scrollToBottomTimer = NaN;
+						}, 10);
+					}
+				}
 			}
 			
 			private function handleWindowClosing(event:Event):void {
@@ -94,13 +107,13 @@
 			}
 			
 			private function handleWebSocketClosed(event:WebSocketEvent):void {
-				trace("Websocket closed.");
+				WebSocket.logger("Websocket closed.");
 				disconnectButton.enabled = false;
 				connectButton.enabled = true;
 			}
 			
 			private function handleWebSocketOpen(event:WebSocketEvent):void {
-				trace("Websocket Connected");
+				WebSocket.logger("Websocket Connected");
 				disconnectButton.enabled = true;
 			}
 			
@@ -121,11 +134,11 @@
 						dumbIncrementValue = parseInt(event.message.utf8Data, 10);
 					}
 					else {
-						trace(event.message.utf8Data);						
+						WebSocket.logger(event.message.utf8Data);						
 					}
 				}
 				else if (event.message.type === WebSocketMessage.TYPE_BINARY) {
-					trace("Binary message received.  Length: " + event.message.binaryData.length);
+					WebSocket.logger("Binary message received.  Length: " + event.message.binaryData.length);
 				}
 			}
 			
@@ -163,7 +176,7 @@
 			}
 			
 			private function closeConnection():void {
-				trace("Disconnecting.");
+				WebSocket.logger("Disconnecting.");
 				websocket.close();
 			}
 			
@@ -171,50 +184,61 @@
 				drawCanvas.graphics.clear();
 			}
 			
+			private function clearLog():void {
+				logOutput.text = "";
+			}
+			
 		]]>
 	</fx:Script>
 	
 	<s:layout>
-		<s:VerticalLayout gap="10" horizontalAlign="center" />
+		<s:HorizontalLayout gap="5" verticalAlign="top" />
 	</s:layout>
 	
-	<s:HGroup verticalAlign="middle"
-			  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
-		<s:Label text="Host" />
-		<s:TextInput id="host" />
-		<mx:Spacer width="10" />
-		<s:Label text="Port" />
-		<s:TextInput text="7681" id="port" />
-		<s:DropDownList dataProvider="{protocolList}" width="150" selectedIndex="0" id="protocolSelector" />
-	</s:HGroup>
-	<s:HGroup verticalAlign="middle"
-			  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
-		<s:CheckBox label="Enable deflate-stream" id="enableDeflateStreamCheckBox" selected="true" />
-		<s:Button id="disconnectButton" enabled="false" label="Disconnect" click="closeConnection();" />
-		<s:Button id="connectButton" label="Connect" click="openConnection();" />
-	</s:HGroup>
-	
-	<s:VGroup horizontalAlign="center" width="100%">
-		<s:Label text="Dumb Increment value: {dumbIncrementValue}" />
-		<s:Button label="Reset Counter" click="resetCounter()" />
+	<s:VGroup gap="10" horizontalAlign="center" width="510">
+		<s:HGroup verticalAlign="middle"
+				  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
+			<s:Label text="Host" />
+			<s:TextInput id="host" />
+			<mx:Spacer width="5" />
+			<s:Label text="Port" />
+			<s:TextInput text="7681" id="port" width="50" />
+			<s:DropDownList dataProvider="{protocolList}" width="200" selectedIndex="0" id="protocolSelector" />
+		</s:HGroup>
+		<s:HGroup verticalAlign="middle"
+				  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
+			<s:CheckBox label="Enable deflate-stream" id="enableDeflateStreamCheckBox" selected="true" />
+			<s:Button id="disconnectButton" enabled="false" label="Disconnect" click="closeConnection();" />
+			<s:Button id="connectButton" label="Connect" click="openConnection();" />
+		</s:HGroup>
+		
+		<s:VGroup horizontalAlign="center" width="100%">
+			<s:Label text="Dumb Increment value: {dumbIncrementValue}" />
+			<s:Button label="Reset Counter" click="resetCounter()" />
+		</s:VGroup>
+		
+		<s:Group width="502" height="306"
+				 mouseDown="handleMouseDown(event)"
+				 mouseUp="handleMouseUp(event)"
+				 mouseMove="handleMouseMove(event)">
+			<s:Rect width="100%" height="100%">
+				<s:stroke>
+					<s:SolidColorStroke color="#000000" />
+				</s:stroke>
+				<s:fill>
+					<s:SolidColor color="#DDDDDD" />
+				</s:fill>
+			</s:Rect>
+			<s:Graphic id="drawCanvas" width="100%" height="100%" />
+		</s:Group>
+		
+		<s:Button label="Clear Canvas" click="clearCanvas()" />
 	</s:VGroup>
 	
+	<s:VGroup horizontalAlign="center" gap="10" width="100%" height="100%" paddingBottom="7">
+		<s:TextArea id="logOutput" width="100%" height="100%" />
+		<s:Button label="Clear Log" click="clearLog()" />
+	</s:VGroup>
 	
-	<s:Group width="502" height="306"
-			 mouseDown="handleMouseDown(event)"
-			 mouseUp="handleMouseUp(event)"
-			 mouseMove="handleMouseMove(event)">
-		<s:Rect width="100%" height="100%">
-			<s:stroke>
-				<s:SolidColorStroke color="#000000" />
-			</s:stroke>
-			<s:fill>
-				<s:SolidColor color="#DDDDDD" />
-			</s:fill>
-		</s:Rect>
-		<s:Graphic id="drawCanvas" width="100%" height="100%" />
-	</s:Group>
-
-	<s:Button label="Clear Canvas" click="clearCanvas()" />
 	
 </s:WindowedApplication>

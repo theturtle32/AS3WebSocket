@@ -68,6 +68,10 @@ package com.worlize.websocket
 		
 		public static var debug:Boolean = true;
 		
+		public static var logger:Function = function(text:String):void {
+			logger(text);
+		};
+		
 		public function WebSocket(url:String, origin:String, protocol:String = null, timeout:uint = 20000, socket:Socket = null)
 		{
 			super(null);
@@ -107,7 +111,7 @@ package com.worlize.websocket
 				
 				socket.connect(_host, _port);
 				if (debug) {
-					trace("Connecting to " + _host + " on port " + _port);
+					logger("Connecting to " + _host + " on port " + _port);
 				}
 			}
 		}
@@ -306,14 +310,14 @@ package com.worlize.websocket
 		
 		private function handleSocketConnect(event:Event):void {
 			if (debug) {
-				trace("Socket Connected");
+				logger("Socket Connected");
 			}
 			sendHandshake();
 		}
 		
 		private function handleSocketClose(event:Event):void {
 			if (debug) {
-				trace("Socket Disconnected");
+				logger("Socket Disconnected");
 			}
 			dispatchClosedEvent();
 		}
@@ -392,18 +396,18 @@ package com.worlize.websocket
 					break;
 				case WebSocketOpcode.PING:
 					if (debug) {
-						trace("Received Ping");
+						logger("Received Ping");
 					}
 					pong();
 					break;
 				case WebSocketOpcode.PONG:
 					if (debug) {
-						trace("Received Pong");
+						logger("Received Pong");
 					}
 					break;
 				case WebSocketOpcode.CONNECTION_CLOSE:
 					if (debug) {
-						trace("Received close from server");
+						logger("Received close from server");
 					}
 					if (waitingForServerClose) {
 						// got confirmation from server, finish closing connection
@@ -419,7 +423,7 @@ package com.worlize.websocket
 					break;
 				default:
 					if (debug) {
-						trace("Unrecognized Opcode: 0x" + frame.opcode.toString(16));
+						logger("Unrecognized Opcode: 0x" + frame.opcode.toString(16));
 					}
 					break;
 			}
@@ -427,7 +431,7 @@ package com.worlize.websocket
 		
 		private function handleSocketIOError(event:IOErrorEvent):void {
 			if (debug) {
-				trace("IO Error: " + event);
+				logger("IO Error: " + event);
 			}
 			dispatchEvent(event.clone());
 			close();
@@ -435,7 +439,7 @@ package com.worlize.websocket
 		
 		private function handleSocketSecurityError(event:SecurityErrorEvent):void {
 			if (debug) {
-				trace("Security Error: " + event);
+				logger("Security Error: " + event);
 			}
 			dispatchEvent(event.clone());
 			close();
@@ -463,7 +467,7 @@ package com.worlize.websocket
 			text += "\r\n";
 			
 			if (debug) {
-				trace(text);
+				logger(text);
 			}
 			
 			socket.writeMultiByte(text, 'us-ascii');
@@ -493,15 +497,15 @@ package com.worlize.websocket
 					// have all the http headers
 					
 					if (debug) {
-						trace("Have all the http headers.");
-						trace(serverHandshakeResponse);
+						logger("Have all the http headers.");
+						logger(serverHandshakeResponse);
 					}
 					
 					var lines:Array = serverHandshakeResponse.split("\r\n");
 					var responseLine:String = lines.shift();
 					if (responseLine.indexOf("HTTP/1.1 101") === 0) {
 						if (debug) {
-							trace("101 response received!");
+							logger("101 response received!");
 						}
 						// got 101 response!  Woohoo!
 						
@@ -529,17 +533,17 @@ package com.worlize.websocket
 							}
 							else if (lcName === 'sec-websocket-accept') {
 								var expectedKey:String = SHA1.hashToBase64(base64nonce + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-								trace("Expected Sec-WebSocket-Accept value: " + expectedKey);
+								logger("Expected Sec-WebSocket-Accept value: " + expectedKey);
 								if (value === expectedKey) {
 									keyValidated = true;
 								}
 							}
 						}
 						if (debug) {
-							trace("UpgradeHeader: " + upgradeHeader);
-							trace("ConnectionHeader: " + connectionHeader);
-							trace("KeyValidated: " + keyValidated);
-							trace("Server Extensions: " + serverExtensions.join(' | '));
+							logger("UpgradeHeader: " + upgradeHeader);
+							logger("ConnectionHeader: " + connectionHeader);
+							logger("KeyValidated: " + keyValidated);
+							logger("Server Extensions: " + serverExtensions.join(' | '));
 						}
 						if (upgradeHeader && connectionHeader && keyValidated) {
 							// The connection is validated!!
@@ -621,7 +625,7 @@ package com.worlize.websocket
 			}
 			
 			if (debug) {
-				trace("ZLib constructed");
+				logger("ZLib constructed");
 			}
 		}
 		
@@ -632,7 +636,7 @@ package com.worlize.websocket
 				zstreamIn = null;
 				zstreamOut = null;
 				if (debug) {
-					trace("ZLib destructed");
+					logger("ZLib destructed");
 				}
 			}
 		}

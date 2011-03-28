@@ -98,28 +98,28 @@ package com.worlize.websocket
 						
 						case WebSocketOpcode.CONTINUATION:
 							if (WebSocket.debug) {
-								trace("Continuation.");
+								WebSocket.logger("Continuation.");
 							}
 							throwAwayPayload(input);
 							break;
 						
 						case WebSocketOpcode.PING:
 							if (WebSocket.debug) {
-								trace("Ping!")
+								WebSocket.logger("Ping!")
 							}
 							throwAwayPayload(input);
 							break;
 						
 						case WebSocketOpcode.PONG:
 							if (WebSocket.debug) {
-								trace("Pong!");
+								WebSocket.logger("Pong!");
 							}
 							throwAwayPayload(input);
 							break;
 						
 						case WebSocketOpcode.CONNECTION_CLOSE:
 							if (WebSocket.debug) {
-								trace("Close Requested.");
+								WebSocket.logger("Close Requested.");
 							}
 							throwAwayPayload(input);
 							break;
@@ -127,7 +127,7 @@ package com.worlize.websocket
 						default:
 							// unknown frame... eat up any data and move on.
 							if (WebSocket.debug) {
-								trace("Unknown frame!");
+								WebSocket.logger("Unknown frame!");
 							}
 							throwAwayPayload(input);
 							break;
