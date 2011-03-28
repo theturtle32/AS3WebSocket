@@ -2,7 +2,7 @@
 <actionScriptProperties mainApplicationPath="AS3WebSocket.as" projectUUID="3361d4ca-c8ef-4bec-b584-63a15885a235" version="6">
   <compiler additionalCompilerArguments="-locale en_US" autoRSLOrdering="true" copyDependentFiles="false" fteInMXComponents="false" generateAccessible="false" htmlExpressInstall="true" htmlGenerate="false" htmlHistoryManagement="false" htmlPlayerVersionCheck="true" includeNetmonSwc="false" outputFolderPath="bin" sourceFolderPath="src" strict="true" targetPlayerVersion="0.0.0" useApolloConfig="false" useDebugRSLSwfs="true" verifyDigests="true" warn="true">
     <compilerSourcePath/>
-    <libraryPath defaultLinkType="0">
+    <libraryPath defaultLinkType="1">
       <libraryPathEntry kind="4" path="">
         <modifiedEntries>
           <libraryPathEntry index="3" kind="3" linkType="4" path="${PROJECT_FRAMEWORKS}/libs/framework.swc" useDefaultLinkType="true">
