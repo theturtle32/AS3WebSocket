@@ -23,3 +23,30 @@ Known Issues:
 - Fragmentation is not yet supported
 - There is no user-provided extension API implemented
 - No wss:// support yet
+
+
+Usage Example:
+
+var websocket:WebSocket = new WebSocket("ws://localhost", "*");
+websocket.enableDeflateStream = true;
+websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
+websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
+websocket.addEventListener(WebSocketEvent.MESSAGE, handleWebSocketMessage);
+websocket.connect();
+
+function handleWebSocketOpen(event:WebSocketEvent):void {
+  trace("Connected");
+}
+
+function handleWebSocketClosed(event:WebSocketEvent):void {
+  trace("Disconnected");
+}
+
+function handleWebSocketMessage(event:WebSocketEvent):void {
+  if (event.message.type === WebSocketMessage.TYPE_UTF8) {
+    trace("Got message: " + event.message.utf8Data);
+  }
+  else if (event.message.type === WebSocketMessage.TYPE_BINARY) {
+    trace("Got binary message of length " + event.message.binaryData.length);
+  }
+}
