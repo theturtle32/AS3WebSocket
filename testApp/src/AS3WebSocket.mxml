@@ -194,7 +194,7 @@
 		<s:Button id="connectButton" label="Connect" click="openConnection();" />
 	</s:HGroup>
 	
-	<s:VGroup horizontalAlign="center">
+	<s:VGroup horizontalAlign="center" width="100%">
 		<s:Label text="Dumb Increment value: {dumbIncrementValue}" />
 		<s:Button label="Reset Counter" click="resetCounter()" />
 	</s:VGroup>
