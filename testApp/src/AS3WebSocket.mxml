@@ -1,0 +1,177 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   width="600" height="500"
+					   creationComplete="handleCreationComplete()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.worlize.websocket.WebSocket;
+			import com.worlize.websocket.WebSocketEvent;
+			import com.worlize.websocket.WebSocketMessage;
+			
+			import flash.utils.setTimeout;
+			
+			import mx.collections.ArrayCollection;
+			
+			import spark.primitives.Line;
+			
+			private var websocket:WebSocket;
+			
+			[Bindable]
+			private var dumbIncrementValue:int = 0;
+			
+			[Bindable]
+			private var protocolList:ArrayCollection = new ArrayCollection([
+				{
+					label: "dumb-increment-protocol",
+					value: "dumb-increment-protocol"
+				},
+				{
+					label: "lws-mirror-protocol",
+					value: "lws-mirror-protocol"
+				}
+			]);
+			
+			private function handleCreationComplete():void {
+				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value']);
+			}
+			
+			private function openConnection():void {
+				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value']);
+				websocket.connect();
+				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
+				websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
+				websocket.addEventListener(WebSocketEvent.MESSAGE, handleWebSocketMessage);
+			}
+			
+			private function handleWebSocketClosed(event:WebSocketEvent):void {
+				trace("Websocket closed.");
+				disconnectButton.enabled = false;
+				connectButton.enabled = true;
+			}
+			
+			private function handleWebSocketOpen(event:WebSocketEvent):void {
+				trace("Websocket Connected");
+				connectButton.enabled = false;
+				disconnectButton.enabled = true;
+			}
+			
+			private function handleWebSocketMessage(event:WebSocketEvent):void {
+				if (event.message.type === WebSocketMessage.TYPE_UTF8) {
+					if (websocket.protocol === 'lws-mirror-protocol') {
+						var fields:Array = event.message.utf8Data.split(' ');
+						var color:uint = parseInt(String(fields[1]).slice(1), 16);
+						var startX:int = parseInt(fields[2], 10);
+						var startY:int = parseInt(fields[3], 10);
+						var endX:int = parseInt(fields[4], 10);
+						var endY:int = parseInt(fields[5], 10);
+						drawCanvas.graphics.lineStyle(1, color, 1, true, LineScaleMode.NORMAL, CapsStyle.SQUARE, JointStyle.MITER);
+						drawCanvas.graphics.moveTo(startX, startY);
+						drawCanvas.graphics.lineTo(endX, endY);
+					}
+					else if (websocket.protocol === 'dumb-increment-protocol') {
+						trace(event.message.utf8Data);
+						dumbIncrementValue = parseInt(event.message.utf8Data, 10);
+					}
+					else {
+						trace(event.message.utf8Data);						
+					}
+				}
+				else if (event.message.type === WebSocketMessage.TYPE_BINARY) {
+					trace("Binary message received.  Length: " + event.message.binaryData.length);
+				}
+			}
+			
+			private var drawing:Boolean = false;
+			private var startMouseX:Number;
+			private var startMouseY:Number;
+			
+			private function handleMouseDown(event:MouseEvent):void {
+				if (websocket.connected && websocket.protocol === 'lws-mirror-protocol') {
+					drawing = true;
+					startMouseX = drawCanvas.mouseX;
+					startMouseY = drawCanvas.mouseY;
+				}
+			}
+			
+			private function handleMouseUp(event:MouseEvent):void {
+				drawing = false;
+			}
+			
+			private function handleMouseMove(event:MouseEvent):void {
+				if (drawing) {
+					var sx:int = startMouseX;
+					var sy:int = startMouseY;
+					var ex:int = startMouseX = drawCanvas.mouseX;
+					var ey:int = startMouseY = drawCanvas.mouseY;
+					var color:uint = 0xDD00CC;
+					websocket.sendUTF(['d', '#' + color.toString(16), sx, sy, ex, ey].join(' ') + ";");
+				}
+			}
+			
+			private function resetCounter():void {
+				if (websocket.connected && websocket.protocol === 'dumb-increment-protocol') {
+					websocket.sendUTF("reset\n");
+				}
+			}
+			
+			private function closeConnection():void {
+				trace("Disconnecting.");
+				websocket.close();
+			}
+			
+			private function clearCanvas():void {
+				drawCanvas.graphics.clear();
+			}
+			
+		]]>
+	</fx:Script>
+	
+	<s:layout>
+		<s:VerticalLayout gap="10" horizontalAlign="center" />
+	</s:layout>
+	
+	<s:HGroup verticalAlign="middle"
+			  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
+		<s:Label text="Host" />
+		<s:TextInput text="192.168.0.113" id="host" />
+		<mx:Spacer width="10" />
+		<s:Label text="Port" />
+		<s:TextInput text="7681" id="port" />
+		<s:DropDownList dataProvider="{protocolList}" width="150" selectedIndex="0" id="protocolSelector" />
+	</s:HGroup>
+	<s:HGroup verticalAlign="middle"
+			  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
+		<s:Button id="disconnectButton" enabled="false" label="Disconnect" click="closeConnection();" />
+		<s:Button id="connectButton" label="Connect" click="openConnection();" />
+	</s:HGroup>
+	
+	<s:VGroup horizontalAlign="center">
+		<s:Label text="Dumb Increment value: {dumbIncrementValue}" />
+		<s:Button label="Reset Counter" click="resetCounter()" />
+	</s:VGroup>
+	
+	
+	<s:Group width="502" height="306"
+			 mouseDown="handleMouseDown(event)"
+			 mouseUp="handleMouseUp(event)"
+			 mouseMove="handleMouseMove(event)">
+		<s:Rect width="100%" height="100%">
+			<s:stroke>
+				<s:SolidColorStroke color="#000000" />
+			</s:stroke>
+			<s:fill>
+				<s:SolidColor color="#DDDDDD" />
+			</s:fill>
+		</s:Rect>
+		<s:Graphic id="drawCanvas" width="100%" height="100%" />
+	</s:Group>
+
+	<s:Button label="Clear Canvas" click="clearCanvas()" />
+	
+</s:WindowedApplication>

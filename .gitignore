@@ -1,0 +1,4 @@
+.DS_Store
+bin-release
+bin-debug
+AS3WebSocket/bin
