@@ -27,11 +27,6 @@ package com.worlize.websocket
 		private static const MODE_UTF8:int = 0;
 		private static const MODE_BINARY:int = 0;
 		
-		private static const PARSE_NEW_FRAME:int = 0;
-		private static const PARSE_WAITING_FOR_16_BIT_LENGTH:int = 1;
-		private static const PARSE_WAITING_FOR_64_BIT_LENGTH:int = 2;
-		private static const PARSE_WAITING_FOR_PAYLOAD:int = 3;
-
 		private var _bufferedAmount:int = 0;
 		
 		private var _readyState:int;
@@ -46,7 +41,6 @@ package com.worlize.websocket
 		private var socket:Socket;
 		private var timeout:uint;
 		
-		private var parseState:int = 0;
 		private var nonce:ByteArray;
 		private var base64nonce:String;
 		private var serverHandshakeResponse:String;
@@ -550,7 +544,6 @@ package com.worlize.websocket
 							
 							serverHandshakeResponse = null;
 							_readyState = WebSocketState.OPEN;
-							parseState = PARSE_NEW_FRAME;
 							
 							if (serverExtensions.indexOf('deflate-stream') !== -1) {
 								initDeflateStream();
