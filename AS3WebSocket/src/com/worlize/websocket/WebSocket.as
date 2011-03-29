@@ -351,7 +351,7 @@ package com.worlize.websocket
 
 			// addData returns true if the frame is complete, and false
 			// if more data is needed.
-			while (currentFrame.addData(incomingBuffer, frameQueue.length > 0 ? frameQueue[0].opcode : 0)) {
+			while (currentFrame.addData(incomingBuffer, fragmentationOpcode)) {
 				processFrame(currentFrame);
 				currentFrame = new WebSocketFrame();
 			}
