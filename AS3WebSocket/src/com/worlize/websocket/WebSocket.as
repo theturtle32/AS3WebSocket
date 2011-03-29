@@ -433,6 +433,7 @@ package com.worlize.websocket
 										0,
 										currentFrame.binaryPayload.length
 									);
+									currentFrame.binaryPayload.clear();
 								}
 								break;
 							case WebSocketOpcode.TEXT_FRAME:
