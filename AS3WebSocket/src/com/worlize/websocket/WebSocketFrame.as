@@ -226,6 +226,14 @@ package com.worlize.websocket
 				// encode the length directly into the two-byte frame header
 				secondByte |= (_length & 0x7F);
 			}
+			else if (_length > 125 && _length <= 0xFFFF) {
+				// Use 16-bit length
+				secondByte |= 126;
+			}
+			else if (_length > 0xFFFF) {
+				// Use 64-bit length
+				secondByte |= 127;
+			}
 			
 			// build the frame header
 			frameHeader.writeByte(firstByte);
