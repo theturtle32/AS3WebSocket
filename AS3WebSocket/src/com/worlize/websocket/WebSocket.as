@@ -428,7 +428,7 @@ package com.worlize.websocket
 				logger("IO Error: " + event);
 			}
 			dispatchEvent(event.clone());
-			close();
+			dispatchClosedEvent();
 		}
 		
 		private function handleSocketSecurityError(event:SecurityErrorEvent):void {
@@ -436,7 +436,7 @@ package com.worlize.websocket
 				logger("Security Error: " + event);
 			}
 			dispatchEvent(event.clone());
-			close();
+			dispatchClosedEvent();
 		}
 		
 		private function sendHandshake():void {
