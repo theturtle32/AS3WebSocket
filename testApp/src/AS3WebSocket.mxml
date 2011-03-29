@@ -35,6 +35,10 @@
 				{
 					label: "lws-mirror-protocol",
 					value: "lws-mirror-protocol"
+				},
+				{
+					label: "fraggle-protocol",
+					value: "fraggle-protocol"
 				}
 			]);
 			
@@ -45,6 +49,7 @@
 				loadSettings();
 				var scrollToBottomTimer:Number = NaN;
 				WebSocket.logger = function(text:String):void {
+					trace(text);
 					log += (text + "\n");
 					logOutput.text = log + "\n";
 					if (isNaN(scrollToBottomTimer)) {
