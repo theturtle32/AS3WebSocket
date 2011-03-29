@@ -33,7 +33,7 @@ package com.worlize.websocket
 		}
 		
 		// Returns true if frame is complete, false if waiting for more data
-		public function addData(input:IDataInput):Boolean {
+		public function addData(input:IDataInput, fragmentationType:int):Boolean {
 			if (input.bytesAvailable >= 2) { // minimum frame size
 				if (parseState === NEW_FRAME) {
 					var firstByte:int = input.readByte();
@@ -77,60 +77,63 @@ package com.worlize.websocket
 					}
 				}
 				if (parseState === WAITING_FOR_PAYLOAD) {
-					switch (opcode) {
-						case WebSocketOpcode.TEXT_FRAME:
-							if (input.bytesAvailable >= _length) {
-								utf8Payload = input.readMultiByte(_length, 'utf-8');
-								parseState = COMPLETE;
-								_frameComplete = true;
-							}
-							break;
-						
-						case WebSocketOpcode.BINARY_FRAME:
-							if (input.bytesAvailable >= _length) {
-								binaryPayload = new ByteArray();
-								binaryPayload.endian = Endian.BIG_ENDIAN;
-								input.readBytes(binaryPayload, 0, _length);
-								parseState = COMPLETE;
-								_frameComplete = true;
-							}
-							break;
-						
-						case WebSocketOpcode.CONTINUATION:
-							if (WebSocket.debug) {
-								WebSocket.logger("Continuation.");
-							}
-							throwAwayPayload(input);
-							break;
-						
-						case WebSocketOpcode.PING:
-							if (WebSocket.debug) {
-								WebSocket.logger("Ping!")
-							}
-							throwAwayPayload(input);
-							break;
-						
-						case WebSocketOpcode.PONG:
-							if (WebSocket.debug) {
-								WebSocket.logger("Pong!");
-							}
-							throwAwayPayload(input);
-							break;
-						
-						case WebSocketOpcode.CONNECTION_CLOSE:
-							if (WebSocket.debug) {
-								WebSocket.logger("Close Requested.");
-							}
-							throwAwayPayload(input);
-							break;
-						
-						default:
-							// unknown frame... eat up any data and move on.
-							if (WebSocket.debug) {
-								WebSocket.logger("Unknown frame!");
-							}
-							throwAwayPayload(input);
-							break;
+					// If the frame has a CONTINUATION opcode, we have to use
+					// the opcode from the first fragmented frame.  Only text
+					// and binary frames can be fragmented.
+					if ((opcode === WebSocketOpcode.CONTINUATION && fragmentationType === WebSocketOpcode.TEXT_FRAME) ||
+						 opcode === WebSocketOpcode.TEXT_FRAME) {
+						if (input.bytesAvailable >= _length) {
+							utf8Payload = input.readMultiByte(_length, 'utf-8');
+							parseState = COMPLETE;
+							_frameComplete = true;
+							return _frameComplete;
+						}
+					}
+					else if ((opcode === WebSocketOpcode.CONTINUATION && fragmentationType === WebSocketOpcode.BINARY_FRAME) ||
+							  opcode === WebSocketOpcode.BINARY_FRAME) {
+						if (input.bytesAvailable >= _length) {
+							binaryPayload = new ByteArray();
+							binaryPayload.endian = Endian.BIG_ENDIAN;
+							input.readBytes(binaryPayload, 0, _length);
+							parseState = COMPLETE;
+							_frameComplete = true;
+							return _frameComplete;
+						}
+					}
+					else {
+						switch (opcode) {
+							case WebSocketOpcode.CONTINUATION:
+								throw new WebSocketError("Unhandled continuation frame!");
+								break;
+							case WebSocketOpcode.PING:
+								if (WebSocket.debug) {
+									WebSocket.logger("Ping!")
+								}
+								throwAwayPayload(input);
+								break;
+							
+							case WebSocketOpcode.PONG:
+								if (WebSocket.debug) {
+									WebSocket.logger("Pong!");
+								}
+								throwAwayPayload(input);
+								break;
+							
+							case WebSocketOpcode.CONNECTION_CLOSE:
+								if (WebSocket.debug) {
+									WebSocket.logger("Close Requested.");
+								}
+								throwAwayPayload(input);
+								break;
+							
+							default:
+								// unknown frame... eat up any data and move on.
+								if (WebSocket.debug) {
+									WebSocket.logger("Unknown frame!");
+								}
+								throwAwayPayload(input);
+								break;
+						}
 					}
 				}
 			}

@@ -46,6 +46,8 @@ package com.worlize.websocket
 		private var serverHandshakeResponse:String;
 		private var serverExtensions:Array;
 		private var currentFrame:WebSocketFrame;
+		private var frameQueue:Vector.<WebSocketFrame>;
+		private var fragmentationOpcode:int = 0;
 		
 		private var waitingForServerClose:Boolean = false;
 		private var closeTimeout:int = 5000;
@@ -349,7 +351,7 @@ package com.worlize.websocket
 
 			// addData returns true if the frame is complete, and false
 			// if more data is needed.
-			while (currentFrame.addData(incomingBuffer)) {
+			while (currentFrame.addData(incomingBuffer, frameQueue.length > 0 ? frameQueue[0].opcode : 0)) {
 				processFrame(currentFrame);
 				currentFrame = new WebSocketFrame();
 			}
@@ -373,20 +375,79 @@ package com.worlize.websocket
 		private function processFrame(frame:WebSocketFrame):void {
 			// for now just publish the message, ignoring fragmentation etc.
 			// frameQueue.push(frame);
-			var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.MESSAGE);
+			var event:WebSocketEvent;
+			var i:int;
+			var currentFrame:WebSocketFrame;
 
 			switch (frame.opcode) {
 				case WebSocketOpcode.BINARY_FRAME:
-					event.message = new WebSocketMessage();
-					event.message.type = WebSocketMessage.TYPE_BINARY;
-					event.message.binaryData = frame.binaryPayload;
-					dispatchEvent(event);
+					if (frame.fin) {
+						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+						event.message = new WebSocketMessage();
+						event.message.type = WebSocketMessage.TYPE_BINARY;
+						event.message.binaryData = frame.binaryPayload;
+						dispatchEvent(event);
+					}
+					else if (frameQueue.length === 0) {
+						// beginning of a fragmented message
+						frameQueue.push(frame);
+						fragmentationOpcode = frame.opcode;
+					}
+					else {
+						throw new WebSocketError("Illegal BINARY_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+					}
 					break;
 				case WebSocketOpcode.TEXT_FRAME:
-					event.message = new WebSocketMessage();
-					event.message.type = WebSocketMessage.TYPE_UTF8;
-					event.message.utf8Data = frame.utf8Payload;
-					dispatchEvent(event);
+					if (frame.fin) {
+						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+						event.message = new WebSocketMessage();
+						event.message.type = WebSocketMessage.TYPE_UTF8;
+						event.message.utf8Data = frame.utf8Payload;
+						dispatchEvent(event);
+					}
+					else if (frameQueue.length === 0) {
+						// beginning of a fragmented message
+						frameQueue.push(frame);
+						fragmentationOpcode = frame.opcode;
+					}
+					else {
+						throw new WebSocketError("Illegal TEXT_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+					}
+					break;
+				case WebSocketOpcode.CONTINUATION:
+					frameQueue.push(frame);
+					if (frame.fin) {
+						// end of fragmented message, so we process the whole
+						// message now
+						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+						event.message = new WebSocketMessage();
+						var messageOpcode:int = frameQueue[0].opcode;
+						switch (messageOpcode) {
+							case WebSocketOpcode.BINARY_FRAME:
+								event.message.type = WebSocketMessage.TYPE_BINARY;
+								event.message.binaryData = new ByteArray();
+								for (i=0; i < frameQueue.length; i++) {
+									currentFrame = frameQueue[i];
+									event.message.binaryData.writeBytes(
+										currentFrame.binaryPayload,
+										0,
+										currentFrame.binaryPayload.length
+									);
+								}
+								break;
+							case WebSocketOpcode.TEXT_FRAME:
+								event.message.type = WebSocketMessage.TYPE_UTF8;
+								event.message.utf8Data = "";
+								for (i=0; i < frameQueue.length; i++) {
+									currentFrame = frameQueue[i];
+									event.message.utf8Data += currentFrame.utf8Payload;
+								}
+								break;
+						}
+						frameQueue = new Vector.<WebSocketFrame>();
+						fragmentationOpcode = 0;
+						dispatchEvent(event);
+					}
 					break;
 				case WebSocketOpcode.PING:
 					if (debug) {
@@ -551,6 +612,7 @@ package com.worlize.websocket
 							
 							// prepare for first frame
 							currentFrame = new WebSocketFrame();
+							frameQueue = new Vector.<WebSocketFrame>();
 							
 							// Initialize Stream Buffers
 							incomingBuffer = new ByteArray();
