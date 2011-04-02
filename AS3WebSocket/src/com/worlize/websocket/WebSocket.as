@@ -3,6 +3,10 @@ package com.worlize.websocket
 	import com.adobe.crypto.SHA1;
 	import com.adobe.net.URI;
 	import com.adobe.net.URIEncodingBitmap;
+	import com.hurlant.crypto.tls.TLSConfig;
+	import com.hurlant.crypto.tls.TLSEngine;
+	import com.hurlant.crypto.tls.TLSSecurityParameters;
+	import com.hurlant.crypto.tls.TLSSocket;
 	import com.wirelust.as3zlib.Deflate;
 	import com.wirelust.as3zlib.Inflate;
 	import com.wirelust.as3zlib.JZlib;
@@ -46,6 +50,7 @@ package com.worlize.websocket
 		private var _secure:Boolean;
 		private var _origin:String;
 		
+		private var rawSocket:Socket;
 		private var socket:Socket;
 		private var timeout:uint;
 		
@@ -72,6 +77,9 @@ package com.worlize.websocket
 		private var incomingBuffer:ByteArray;
 		private var outgoingBuffer:ByteArray;
 		
+		private var tlsConfig:TLSConfig;
+		private var tlsSocket:TLSSocket;
+		
 		private var URIpathExcludedBitmap:URIEncodingBitmap =
 			new URIEncodingBitmap(URI.URIpathEscape);
 		
@@ -83,7 +91,7 @@ package com.worlize.websocket
 			logger(text);
 		};
 		
-		public function WebSocket(uri:String, origin:String, protocol:String = null, timeout:uint = 10000, socket:Socket = null)
+		public function WebSocket(uri:String, origin:String, protocol:String = null, timeout:uint = 10000)
 		{
 			super(null);
 			_uri = new URI(uri);
@@ -91,30 +99,36 @@ package com.worlize.websocket
 			_origin = origin;
 			this.timeout = timeout;
 			this.handshakeTimeout = timeout;
-			if (socket) {
-				this.socket = socket;
-			}
-			else {
-				this.socket = new Socket();
-			}
 			init();
 		}
 		
 		private function init():void {
 			parseUrl();
-			this.socket.timeout = timeout;
-			this.socket.endian = Endian.BIG_ENDIAN;
-			this.socket.addEventListener(Event.CONNECT, handleSocketConnect);
-			this.socket.addEventListener(Event.CLOSE, handleSocketClose);
-			this.socket.addEventListener(ProgressEvent.SOCKET_DATA, handleSocketData);
-			this.socket.addEventListener(IOErrorEvent.IO_ERROR, handleSocketIOError);
-			this.socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSocketSecurityError);
-			
+
 			closeTimer = new Timer(closeTimeout, 1);
 			closeTimer.addEventListener(TimerEvent.TIMER, handleCloseTimer);
 			
 			handshakeTimer = new Timer(handshakeTimeout, 1);
 			handshakeTimer.addEventListener(TimerEvent.TIMER, handleHandshakeTimer);
+			
+			rawSocket = socket = new Socket();
+			socket.timeout = timeout;
+			
+			if (secure) {
+				tlsConfig = new TLSConfig(TLSEngine.CLIENT,
+										  null, null, null, null, null,
+										  TLSSecurityParameters.PROTOCOL_VERSION);
+				tlsConfig.trustAllCertificates = true;
+				tlsConfig.ignoreCommonNameMismatch = true;
+				socket = tlsSocket = new TLSSocket();
+			}
+			
+			rawSocket.addEventListener(Event.CONNECT, handleSocketConnect);
+			rawSocket.addEventListener(Event.CLOSE, handleSocketClose);
+			rawSocket.addEventListener(IOErrorEvent.IO_ERROR, handleSocketIOError);
+			rawSocket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSocketSecurityError);
+			
+			socket.addEventListener(ProgressEvent.SOCKET_DATA, handleSocketData);
 			
 			_readyState = WebSocketState.INIT;
 		}
@@ -125,7 +139,7 @@ package com.worlize.websocket
 				generateNonce();
 				handshakeBytesReceived = 0;
 				
-				socket.connect(_host, _port);
+				rawSocket.connect(_host, _port);
 				if (debug) {
 					logger("Connecting to " + _host + " on port " + _port);
 				}
@@ -281,11 +295,13 @@ package com.worlize.websocket
 				}
 				zstreamOut.next_out.position = 0;
 				socket.writeBytes(zstreamOut.next_out, 0, zstreamOut.next_out.length);
+				socket.flush();
 				zstreamOut.next_in.clear();
 				zstreamOut.next_out.clear();
 			}
 			else {
 				socket.writeBytes(data, 0, data.bytesAvailable);
+				socket.flush();
 				data.clear();
 			}
 		}
@@ -326,6 +342,13 @@ package com.worlize.websocket
 			if (debug) {
 				logger("Socket Connected");
 			}
+			if (secure) {
+				if (debug) {
+					logger("starting SSL/TLS");
+				}
+				tlsSocket.startTLS(rawSocket, _host, tlsConfig);
+			}
+			socket.endian = Endian.BIG_ENDIAN;
 			sendHandshake();
 		}
 		
@@ -597,6 +620,9 @@ package com.worlize.websocket
 				}
 
 				headersTerminatorIndex = serverHandshakeResponse.search(/\r?\n\r?\n/);
+			}
+			if (headersTerminatorIndex === -1) {
+				return;
 			}
 
 			if (debug) {
