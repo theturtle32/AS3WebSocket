@@ -54,7 +54,7 @@ function handleWebSocketClosed(event:WebSocketEvent):void {
 }
 
 private function handleConnectionFail(event:WebSocketErrorEvent):void {
-	trace("Connection Failure: " + event.text);
+  trace("Connection Failure: " + event.text);
 }
 
 function handleWebSocketMessage(event:WebSocketEvent):void {
