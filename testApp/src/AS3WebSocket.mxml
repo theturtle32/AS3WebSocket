@@ -15,11 +15,7 @@
 			import com.worlize.websocket.WebSocketEvent;
 			import com.worlize.websocket.WebSocketMessage;
 			
-			import flash.utils.setTimeout;
-			
 			import mx.collections.ArrayCollection;
-			
-			import spark.primitives.Line;
 			
 			private var websocket:WebSocket;
 			
@@ -69,29 +65,29 @@
 			
 			private function loadSettings():void {
 				var sharedObject:SharedObject = SharedObject.getLocal('settings');
-				host.text = sharedObject.data.host || 'localhost';
-				port.text = sharedObject.data.port || '7681';
+				urlField.text = sharedObject.data.url || 'ws://localhost:7681';
 				if ('enableDeflateStream' in sharedObject.data) {
 					enableDeflateStreamCheckBox.selected = sharedObject.data.enableDeflateStream;
 				}
-				if ('subprotocolIndex' in sharedObject.data) {
-					protocolSelector.selectedIndex = sharedObject.data.subprotocolIndex;
+				if ('subprotocol' in sharedObject.data) {
+					protocolSelector.selectedItem = null;
+					protocolSelector.textInput.text = sharedObject.data.subprotocol;
 				}
 			}
 			
 			private function saveSettings():void {
 				var sharedObject:SharedObject = SharedObject.getLocal('settings');
-				sharedObject.data.host = host.text;
-				sharedObject.data.port = port.text;
+				sharedObject.data.url = urlField.text;
 				sharedObject.data.enableDeflateStream = enableDeflateStreamCheckBox.selected;
-				sharedObject.data.subprotocolIndex = protocolSelector.selectedIndex;
+				sharedObject.data.subprotocol = protocolSelector.selectedIndex < 0 ? protocolSelector.textInput.text : protocolSelector.selectedItem['value'];
 				sharedObject.flush();
 			}
 			
 			private function openConnection():void {
 				saveSettings();
 				connectButton.enabled = false;
-				websocket = new WebSocket("ws://" + host.text + ":" + port.text, "*", protocolSelector.selectedItem['value'], 5000);
+				var subprotocol:String = protocolSelector.selectedIndex < 0 ? protocolSelector.textInput.text : protocolSelector.selectedItem['value'];
+				websocket = new WebSocket(urlField.text, "*", subprotocol, 5000);
 				websocket.enableDeflateStream = enableDeflateStreamCheckBox.selected;
 				websocket.connect();
 				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
@@ -217,14 +213,11 @@
 	</s:layout>
 	
 	<s:VGroup gap="10" horizontalAlign="center" width="510">
-		<s:HGroup verticalAlign="middle"
+		<s:HGroup verticalAlign="middle" width="100%"
 				  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
-			<s:Label text="Host" />
-			<s:TextInput id="host" />
-			<mx:Spacer width="5" />
-			<s:Label text="Port" />
-			<s:TextInput text="7681" id="port" width="50" />
-			<s:DropDownList dataProvider="{protocolList}" width="200" selectedIndex="0" id="protocolSelector" />
+			<s:Label text="URL" />
+			<s:TextInput id="urlField" width="100%" />
+			<s:ComboBox dataProvider="{protocolList}" width="200" selectedIndex="0" id="protocolSelector" />
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle"
 				  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">

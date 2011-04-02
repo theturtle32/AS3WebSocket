@@ -1,6 +1,8 @@
 package com.worlize.websocket
 {
 	import com.adobe.crypto.SHA1;
+	import com.adobe.net.URI;
+	import com.adobe.net.URIEncodingBitmap;
 	import com.wirelust.as3zlib.Deflate;
 	import com.wirelust.as3zlib.Inflate;
 	import com.wirelust.as3zlib.JZlib;
@@ -22,15 +24,21 @@ package com.worlize.websocket
 	import mx.utils.Base64Encoder;
 	import mx.utils.URLUtil;
 	
+	[Event(name="connectionFail",type="com.worlize.websocket.WebSocketErrorEvent")]
+	[Event(name="message",type="com.worlize.websocket.WebSocketEvent")]
+	[Event(name="open",type="com.worlize.websocket.WebSocketEvent")]
+	[Event(name="closed",type="com.worlize.websocket.WebSocketEvent")]
 	public class WebSocket extends EventDispatcher
 	{
 		private static const MODE_UTF8:int = 0;
 		private static const MODE_BINARY:int = 0;
 		
+		private static const MAX_HANDSHAKE_BYTES:int = 10 * 1024; // 10KiB
+		
 		private var _bufferedAmount:int = 0;
 		
 		private var _readyState:int;
-		private var _uri:String;
+		private var _uri:URI;
 		private var _protocol:String;
 		private var _host:String;
 		private var _port:uint;
@@ -53,12 +61,19 @@ package com.worlize.websocket
 		private var closeTimeout:int = 5000;
 		private var closeTimer:Timer;
 		
+		private var handshakeBytesReceived:int;
+		private var handshakeTimer:Timer;
+		private var handshakeTimeout:int = 5000;
+		
 		private var deflateStream:Boolean = false;
 		private var zstreamOut:ZStream;
 		private var zstreamIn:ZStream;
 		
 		private var incomingBuffer:ByteArray;
 		private var outgoingBuffer:ByteArray;
+		
+		private var URIpathExcludedBitmap:URIEncodingBitmap =
+			new URIEncodingBitmap(URI.URIpathEscape);
 		
 		public var enableDeflateStream:Boolean = true;
 		
@@ -68,13 +83,14 @@ package com.worlize.websocket
 			logger(text);
 		};
 		
-		public function WebSocket(url:String, origin:String, protocol:String = null, timeout:uint = 20000, socket:Socket = null)
+		public function WebSocket(uri:String, origin:String, protocol:String = null, timeout:uint = 10000, socket:Socket = null)
 		{
 			super(null);
-			_uri = url;
+			_uri = new URI(uri);
 			_protocol = protocol;
 			_origin = origin;
 			this.timeout = timeout;
+			this.handshakeTimeout = timeout;
 			if (socket) {
 				this.socket = socket;
 			}
@@ -97,6 +113,9 @@ package com.worlize.websocket
 			closeTimer = new Timer(closeTimeout, 1);
 			closeTimer.addEventListener(TimerEvent.TIMER, handleCloseTimer);
 			
+			handshakeTimer = new Timer(handshakeTimeout, 1);
+			handshakeTimer.addEventListener(TimerEvent.TIMER, handleHandshakeTimer);
+			
 			_readyState = WebSocketState.INIT;
 		}
 		
@@ -104,6 +123,7 @@ package com.worlize.websocket
 			if (_readyState === WebSocketState.INIT || _readyState === WebSocketState.CLOSED) {
 				_readyState = WebSocketState.CONNECTING;
 				generateNonce();
+				handshakeBytesReceived = 0;
 				
 				socket.connect(_host, _port);
 				if (debug) {
@@ -113,36 +133,34 @@ package com.worlize.websocket
 		}
 		
 		private function parseUrl():void {
-			_host = URLUtil.getServerName(_uri);
-			var protocol:String = URLUtil.getProtocol(_uri).toLocaleLowerCase();
-			if (protocol === 'wss') {
+			_host = _uri.authority;
+			var scheme:String = _uri.scheme.toLocaleLowerCase();
+			if (scheme === 'wss') {
 				_secure = true;
 				_port = 443;
 			}
-			else if (protocol === 'ws') {
+			else if (scheme === 'ws') {
 				_secure = false;
 				_port = 80;
 			}
 			else {
-				throw new Error("Unsupported Protocol: " + protocol);
+				throw new Error("Unsupported scheme: " + scheme);
 			}
 			
-			var tempPort:uint = URLUtil.getPort(_uri);
-			if (tempPort > 0) {
+			var tempPort:uint = parseInt(_uri.port, 10);
+			if (!isNaN(tempPort) && tempPort !== 0) {
 				_port = tempPort;
 			}
 			
-			var temp:String = _uri;
-			if (temp.indexOf('//') !== -1) {
-				temp = temp.slice(temp.indexOf('//')+2);
+			var path:String = URI.fastEscapeChars(_uri.path, URIpathExcludedBitmap);
+			if (path.length === 0) {
+				path = "/";
 			}
-			if (temp.indexOf('/') !== -1) {
-				temp = temp.slice(temp.indexOf('/'));
-				_resource = temp;
+			var query:String = _uri.queryRaw;
+			if (query.length > 0) {
+				query = "?" + query;
 			}
-			else {
-				_resource = "/";
-			}
+			_resource = path + query;
 		}
 		
 		private function generateNonce():void {
@@ -337,7 +355,7 @@ package com.worlize.websocket
 					if (err === JZlib.Z_NEED_DICT ||
 						err === JZlib.Z_DATA_ERROR ||
 					 	err === JZlib.Z_MEM_ERROR) {
-						throw new Error("Zlib error inflate: " + err);
+						failConnection("Zlib error inflate: " + err);
 					}
 					zstreamIn.next_out.position = 0;
 					zstreamIn.next_out.readBytes(incomingBuffer, incomingBuffer.position, zstreamIn.next_out.bytesAvailable);
@@ -527,11 +545,41 @@ package com.worlize.websocket
 			}
 			
 			socket.writeMultiByte(text, 'us-ascii');
+			
+			handshakeTimer.stop();
+			handshakeTimer.reset();
+			handshakeTimer.start();
 		}
 		
-		private function failHandshake():void {
+		private function failHandshake(message:String = "Unable to complete websocket handshake."):void {
 			_readyState = WebSocketState.CLOSED;
-			socket.close();
+			if (socket.connected) {
+				socket.close();
+			}
+			
+			handshakeTimer.stop();
+			handshakeTimer.reset();
+			
+			var errorEvent:WebSocketErrorEvent = new WebSocketErrorEvent(WebSocketErrorEvent.CONNECTION_FAIL);
+			errorEvent.text = message;
+			dispatchEvent(errorEvent);
+			
+			var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.CLOSED);
+			dispatchEvent(event);
+		}
+		
+		private function failConnection(message:String):void {
+			_readyState = WebSocketState.CLOSED;
+			if (socket.connected) {
+				socket.close();
+			}
+			
+			var errorEvent:WebSocketErrorEvent = new WebSocketErrorEvent(WebSocketErrorEvent.CONNECTION_FAIL);
+			errorEvent.text = message;
+			dispatchEvent(errorEvent);
+			
+			var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.CLOSED);
+			dispatchEvent(event);
 		}
 		
 		private function readServerHandshake():void {
@@ -539,122 +587,149 @@ package com.worlize.websocket
 			var connectionHeader:Boolean = false;
 			var serverProtocolHeaderMatch:Boolean = false;
 			var keyValidated:Boolean = false;
+			var headersTerminatorIndex:int = -1;
 			
-			while (socket.bytesAvailable) {
-			
-				try {
-					readHandshakeLine();
-				}
-				catch (e:WebSocketError) {
+			// Load in HTTP Header lines until we encounter a double-newline.
+			while (headersTerminatorIndex === -1 && readHandshakeLine()) {
+				if (handshakeBytesReceived > MAX_HANDSHAKE_BYTES) {
+					failHandshake("Received more than " + MAX_HANDSHAKE_BYTES + " bytes during handshake.");
 					return;
 				}
-	
-				if (serverHandshakeResponse.indexOf("\r\n\r\n") !== -1) {
-					// have all the http headers
-					
-					if (debug) {
-						logger("Have all the http headers.");
-						logger(serverHandshakeResponse);
+
+				headersTerminatorIndex = serverHandshakeResponse.search(/\r?\n\r?\n/);
+			}
+
+			if (debug) {
+				logger("Server Response Headers:\n" + serverHandshakeResponse);
+			}
+			
+			// Slice off the trailing \r\n\r\n from the handshake data
+			serverHandshakeResponse = serverHandshakeResponse.slice(0, headersTerminatorIndex);
+			
+			var lines:Array = serverHandshakeResponse.split(/\r?\n/);
+
+			// Validate status line
+			var responseLine:String = lines.shift();
+			var responseLineMatch:Array = responseLine.match(/^(HTTP\/\d\.\d) (\d{3}) ?(.*)$/i); 
+			if (responseLineMatch.length === 0) {
+				failHandshake("Unable to find correctly-formed HTTP status line.");
+				return;
+			}
+			var httpVersion:String = responseLineMatch[1];
+			var statusCode:int = parseInt(responseLineMatch[2], 10);
+			var statusDescription:String = responseLineMatch[3];
+			if (debug) {
+				logger("HTTP Status Received: " + statusCode + " " + statusDescription);
+			}
+			
+			// Verify correct status code received
+			if (statusCode !== 101) {
+				failHandshake("An HTTP response code other than 101 was received.  Actual Response Code: " + statusCode + " " + statusDescription);
+				return;
+			}
+
+			// Interpret HTTP Response Headers
+			serverExtensions = [];
+			try {
+				while (lines.length > 0) {
+					responseLine = lines.shift();
+					var header:Object = parseHTTPHeader(responseLine);
+					var lcName:String = header.name.toLocaleLowerCase();
+					var lcValue:String = header.value.toLocaleLowerCase();
+					if (lcName === 'upgrade' && lcValue === 'websocket') {
+						upgradeHeader = true;
 					}
-					
-					var lines:Array = serverHandshakeResponse.split("\r\n");
-					var responseLine:String = lines.shift();
-					if (responseLine.indexOf("HTTP/1.1 101") === 0) {
-						if (debug) {
-							logger("101 response received!");
-						}
-						// got 101 response!  Woohoo!
-						
-						serverExtensions = [];
-						
-						while (lines.length > 0) {
-							responseLine = lines.shift();
-							var header:Array = responseLine.split(/\: */);
-							var name:String = header[0];
-							var value:String = header[1];
-							if (name === null || value === null) {
-								continue;
-							}
-							var lcName:String = name.toLocaleLowerCase();
-							var lcValue:String = value.toLocaleLowerCase();
-							if (lcName === 'upgrade' && lcValue === 'websocket') {
-								upgradeHeader = true;
-							}
-							else if (lcName === 'connection' && lcValue === 'upgrade') {
-								connectionHeader = true;
-							}
-							else if (lcName === 'sec-websocket-extensions' && value) {
-								var extensionsThisLine:Array = value.split(',');
-								serverExtensions = serverExtensions.concat(extensionsThisLine);
-							}
-							else if (lcName === 'sec-websocket-accept') {
-								var expectedKey:String = SHA1.hashToBase64(base64nonce + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
-								logger("Expected Sec-WebSocket-Accept value: " + expectedKey);
-								if (value === expectedKey) {
-									keyValidated = true;
-								}
-							}
-						}
-						if (debug) {
-							logger("UpgradeHeader: " + upgradeHeader);
-							logger("ConnectionHeader: " + connectionHeader);
-							logger("KeyValidated: " + keyValidated);
-							logger("Server Extensions: " + serverExtensions.join(' | '));
-						}
-						if (upgradeHeader && connectionHeader && keyValidated) {
-							// The connection is validated!!
-							
-							serverHandshakeResponse = null;
-							_readyState = WebSocketState.OPEN;
-							
-							if (serverExtensions.indexOf('deflate-stream') !== -1) {
-								initDeflateStream();
-							}
-							
-							// prepare for first frame
-							currentFrame = new WebSocketFrame();
-							frameQueue = new Vector.<WebSocketFrame>();
-							
-							// Initialize Stream Buffers
-							incomingBuffer = new ByteArray();
-							incomingBuffer.endian = Endian.BIG_ENDIAN;
-							outgoingBuffer = new ByteArray();
-							outgoingBuffer.endian = Endian.BIG_ENDIAN;
-							
-							dispatchEvent(new WebSocketEvent(WebSocketEvent.OPEN));
-							
-							// Start reading data
-							handleSocketData();
-							return;
-						}
-						else {
-							failHandshake();
-							return;
-						}
+					else if (lcName === 'connection' && lcValue === 'upgrade') {
+						connectionHeader = true;
 					}
-					else {
-						failHandshake();
-						return;
+					else if (lcName === 'sec-websocket-extensions' && header.value) {
+						var extensionsThisLine:Array = header.value.split(',');
+						serverExtensions = serverExtensions.concat(extensionsThisLine);
+					}
+					else if (lcName === 'sec-websocket-accept') {
+						var expectedKey:String = SHA1.hashToBase64(base64nonce + "258EAFA5-E914-47DA-95CA-C5AB0DC85B11");
+						if (debug) {
+							logger("Expected Sec-WebSocket-Accept value: " + expectedKey);
+						}
+						if (header.value === expectedKey) {
+							keyValidated = true;
+						}
 					}
 				}
 			}
+			catch(e:Error) {
+				failHandshake("There was an error while parsing the following HTTP Header line:\n" + responseLine);
+				return;
+			}
+			
+			if (!upgradeHeader) {
+				failHandshake("The server response did not include a valid Upgrade: websocket header.");
+				return;
+			}
+			if (!connectionHeader) {
+				failHandshake("The server response did not include a valid Connection: upgrade header.");
+				return;
+			}
+			if (!keyValidated) {
+				failHandshake("Unable to validate server response for Sec-Websocket-Accept header.");
+			}
+
+			if (debug) {
+				logger("Server Extensions: " + serverExtensions.join(' | '));
+			}
+			
+			// The connection is validated!!
+			handshakeTimer.stop();
+			handshakeTimer.reset()
+			
+			serverHandshakeResponse = null;
+			_readyState = WebSocketState.OPEN;
+			
+			if (serverExtensions.indexOf('deflate-stream') !== -1) {
+				initDeflateStream();
+			}
+			
+			// prepare for first frame
+			currentFrame = new WebSocketFrame();
+			frameQueue = new Vector.<WebSocketFrame>();
+			
+			// Initialize Stream Buffers
+			incomingBuffer = new ByteArray();
+			incomingBuffer.endian = Endian.BIG_ENDIAN;
+			outgoingBuffer = new ByteArray();
+			outgoingBuffer.endian = Endian.BIG_ENDIAN;
+			
+			dispatchEvent(new WebSocketEvent(WebSocketEvent.OPEN));
+			
+			// Start reading data
+			handleSocketData();
+			return;
 		}
 		
-		private function readHandshakeLine():String {
-			var line:String = "";
+		private function handleHandshakeTimer(event:TimerEvent):void {
+			failHandshake();
+		}
+		
+		private function parseHTTPHeader(line:String):Object {
+			var header:Array = line.split(/\: */);
+			return header.length === 2 ? {
+				name: header[0],
+				value: header[1]
+			} : null;
+		}
+		
+		// Return true if the header is completely read
+		private function readHandshakeLine():Boolean {
 			var char:String;
 			while (socket.bytesAvailable) {
 				char = socket.readMultiByte(1, 'us-ascii');
-				line += char;
+				handshakeBytesReceived ++;
+				serverHandshakeResponse += char;
 				if (char == "\n") {
-					break;
+					return true;
 				}
 			}
-			serverHandshakeResponse += line;
-			if (line.indexOf("\n") === -1) {
-				throw new WebSocketError("Not enough bytes to form a line yet.");
-			}
-			return line;
+			return false;
 		}
 		
 		private function initDeflateStream():void {
@@ -672,12 +747,12 @@ package com.worlize.websocket
 			
 			err = zstreamOut.deflateInitWithIntIntBoolean(JZlib.Z_BEST_SPEED, windowBitsOut, true);
 			if (err !== JZlib.Z_OK) {
-				throw new Error("Error calling deflateInitWithIntIntBoolean() - " + err);
+				failConnection("Error calling deflateInitWithIntIntBoolean() - " + err);
 			}
 			
 			err = zstreamIn.inflateInitWithWbitsNoWrap(windowBitsIn, true);
 			if (err !== JZlib.Z_OK) {
-				throw new Error("Error calling inflateInitWithWbitsNoWrap() - " + err);
+				failConnection("Error calling inflateInitWithWbitsNoWrap() - " + err);
 			}
 			
 			if (debug) {
@@ -698,6 +773,9 @@ package com.worlize.websocket
 		}
 		
 		private function dispatchClosedEvent():void {
+			if (handshakeTimer.running) {
+				handshakeTimer.stop();
+			}
 			_readyState = WebSocketState.CLOSED;
 			var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.CLOSED);
 			dispatchEvent(event);
