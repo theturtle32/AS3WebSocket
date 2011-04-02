@@ -2,4 +2,4 @@
 bin-release
 bin-debug
 AS3WebSocket/bin
-testApp/AS3WebSocketTest.air
+testApp/*.air
