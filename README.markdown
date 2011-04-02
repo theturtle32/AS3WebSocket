@@ -55,6 +55,11 @@ Usage Example
 
     function handleWebSocketOpen(event:WebSocketEvent):void {
       trace("Connected");
+      websocket.sendUTF("Hello World!\n");
+      
+      var binaryData:ByteArray = new ByteArray();
+      binaryData.writeUTF("Hello as Binary Message!");
+      websocket.sendBytes(binaryData);
     }
 
     function handleWebSocketClosed(event:WebSocketEvent):void {
