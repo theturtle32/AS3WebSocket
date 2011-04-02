@@ -28,11 +28,12 @@ Features
 - Support for deflate-stream extension
 - wss:// TLS support w/ hurlant as3crypto library
   - Learn more here: [as3crypto on Google Code](http://code.google.com/p/as3crypto/)
+- Handle receiving fragmented frames (theoretically. I haven't set up a server that can send fragmented packets against which to test this.)
 - Test Adobe Air app implements two of the subprotocols supported by Andy Green's libwebsockets-test-server:
   - *dumb-increment-protocol* (simple streaming incrementing numbers)
   - *lws-mirror-protocol* (shared drawing canvas)
   - Added *fraggle-protocol* to the list, but I'm having difficulty testing as there seems to be a problem with the libwebsockets-test-fraggle server (its own client complains of corrupt data intermittently when I run it on my machine)
-  - Handle receiving fragmented frames (theoretically. I haven't set up a server that can send fragmented packets against which to test this.)
+
 
 Known Issues:
 -------------
