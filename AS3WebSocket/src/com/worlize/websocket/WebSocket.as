@@ -698,6 +698,7 @@ package com.worlize.websocket
 			}
 			if (!keyValidated) {
 				failHandshake("Unable to validate server response for Sec-Websocket-Accept header.");
+				return;
 			}
 
 			if (debug) {
