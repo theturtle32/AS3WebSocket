@@ -12,6 +12,7 @@
 	<fx:Script>
 		<![CDATA[
 			import com.worlize.websocket.WebSocket;
+			import com.worlize.websocket.WebSocketErrorEvent;
 			import com.worlize.websocket.WebSocketEvent;
 			import com.worlize.websocket.WebSocketMessage;
 			
@@ -95,6 +96,7 @@
 				websocket.addEventListener(WebSocketEvent.MESSAGE, handleWebSocketMessage);
 				websocket.addEventListener(IOErrorEvent.IO_ERROR, handleIOError);
 				websocket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSecurityError);
+				websocket.addEventListener(WebSocketErrorEvent.CONNECTION_FAIL, handleConnectionFail);
 			}
 			
 			private function handleIOError(event:IOErrorEvent):void {
@@ -105,6 +107,10 @@
 			private function handleSecurityError(event:SecurityErrorEvent):void {
 				connectButton.enabled = true;
 				disconnectButton.enabled = false;
+			}
+			
+			private function handleConnectionFail(event:WebSocketErrorEvent):void {
+				WebSocket.logger("Connection Failure: " + event.text);
 			}
 			
 			private function handleWebSocketClosed(event:WebSocketEvent):void {
