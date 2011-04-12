@@ -77,20 +77,23 @@ package com.worlize.websocket
 					}
 				}
 				if (parseState === WAITING_FOR_PAYLOAD) {
-					// If the frame has a CONTINUATION opcode, we have to use
-					// the opcode from the first fragmented frame.  Only text
-					// and binary frames can be fragmented.
-					if ((opcode === WebSocketOpcode.CONTINUATION && fragmentationType === WebSocketOpcode.TEXT_FRAME) ||
-						 opcode === WebSocketOpcode.TEXT_FRAME) {
-						if (input.bytesAvailable >= _length) {
-							utf8Payload = input.readMultiByte(_length, 'utf-8');
-							parseState = COMPLETE;
-							_frameComplete = true;
-							return _frameComplete;
-						}
-					}
-					else if ((opcode === WebSocketOpcode.CONTINUATION && fragmentationType === WebSocketOpcode.BINARY_FRAME) ||
-							  opcode === WebSocketOpcode.BINARY_FRAME) {
+					if (
+						// frame is the first frame in a fragmentation sequence
+						((opcode === WebSocketOpcode.TEXT_FRAME ||
+						  opcode === WebSocketOpcode.BINARY_FRAME) && !fin) ||
+
+						// Or frame is a binary frame
+						opcode === WebSocketOpcode.BINARY_FRAME ||
+						
+						// Or frame is a continuation frame
+						opcode === WebSocketOpcode.CONTINUATION) {
+						// If the frame has a CONTINUATION opcode, we have to use
+						// the opcode from the first fragmented frame.  Only text
+						// and binary frames can be fragmented.
+						// Also, fragmented text frames must be read as binary,
+						// because the frame boundary may occur in the middle of
+						// a utf-8 character.  We'll decode the utf-8 data when
+						// all is said and done.
 						if (input.bytesAvailable >= _length) {
 							binaryPayload = new ByteArray();
 							binaryPayload.endian = Endian.BIG_ENDIAN;
@@ -102,9 +105,15 @@ package com.worlize.websocket
 					}
 					else {
 						switch (opcode) {
-							case WebSocketOpcode.CONTINUATION:
-								throw new WebSocketError("Unhandled continuation frame!");
+							case WebSocketOpcode.TEXT_FRAME:
+								if (input.bytesAvailable >= _length) {
+									utf8Payload = input.readMultiByte(_length, 'utf-8');
+									parseState = COMPLETE;
+									_frameComplete = true;
+									return _frameComplete;
+								}
 								break;
+							
 							case WebSocketOpcode.PING:
 								if (WebSocket.debug) {
 									WebSocket.logger("Ping!")

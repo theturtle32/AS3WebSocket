@@ -269,7 +269,7 @@ package com.worlize.websocket
 			sendData(buffer);
 		}
 		
-		public function pong():void {
+		private function pong():void {
 			verifyConnectionForSend();
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
@@ -459,31 +459,33 @@ package com.worlize.websocket
 					frameQueue.push(frame);
 					if (frame.fin) {
 						// end of fragmented message, so we process the whole
-						// message now
+						// message now.  The data for fragmented text frames
+						// is collected as binary chunks so that we can decode
+						// the utf-8 data when we have all the data.  This is
+						// done because the fragmentation boundary may occur
+						// in the middle of a multi-byte utf-8 character.
 						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
 						event.message = new WebSocketMessage();
 						var messageOpcode:int = frameQueue[0].opcode;
+						var binaryData:ByteArray = new ByteArray();
+						for (i=0; i < frameQueue.length; i++) {
+							currentFrame = frameQueue[i];
+							binaryData.writeBytes(
+								currentFrame.binaryPayload,
+								0,
+								currentFrame.binaryPayload.length
+							);
+							currentFrame.binaryPayload.clear();
+						}
+						binaryData.position = 0;
 						switch (messageOpcode) {
 							case WebSocketOpcode.BINARY_FRAME:
 								event.message.type = WebSocketMessage.TYPE_BINARY;
-								event.message.binaryData = new ByteArray();
-								for (i=0; i < frameQueue.length; i++) {
-									currentFrame = frameQueue[i];
-									event.message.binaryData.writeBytes(
-										currentFrame.binaryPayload,
-										0,
-										currentFrame.binaryPayload.length
-									);
-									currentFrame.binaryPayload.clear();
-								}
+								event.message.binaryData = binaryData;
 								break;
 							case WebSocketOpcode.TEXT_FRAME:
 								event.message.type = WebSocketMessage.TYPE_UTF8;
-								event.message.utf8Data = "";
-								for (i=0; i < frameQueue.length; i++) {
-									currentFrame = frameQueue[i];
-									event.message.utf8Data += currentFrame.utf8Payload;
-								}
+								event.message.utf8Data = binaryData.readMultiByte(binaryData.length, 'utf-8');
 								break;
 						}
 						frameQueue = new Vector.<WebSocketFrame>();
