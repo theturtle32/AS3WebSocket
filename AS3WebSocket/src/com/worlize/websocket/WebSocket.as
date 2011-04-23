@@ -243,6 +243,7 @@ package com.worlize.websocket
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.TEXT_FRAME;
 			frame.utf8Payload = data;
+			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
 			sendData(buffer);
@@ -254,6 +255,7 @@ package com.worlize.websocket
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.BINARY_FRAME;
 			frame.binaryPayload = data;
+			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
 			sendData(buffer);
@@ -264,6 +266,7 @@ package com.worlize.websocket
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PING;
+			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
 			sendData(buffer);
@@ -274,6 +277,7 @@ package com.worlize.websocket
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PONG;
+			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
 			sendData(buffer);
@@ -309,11 +313,12 @@ package com.worlize.websocket
 		public function close(waitForServer:Boolean = true):void {
 			if (socket.connected) {
 				var frame:WebSocketFrame = new WebSocketFrame();
-				frame.rsv1 = frame.rsv2 = frame.rsv3 = frame.rsv4 = false;
+				frame.rsv1 = frame.rsv2 = frame.rsv3 = frame.mask = false;
 				frame.fin = true;
 				frame.opcode = WebSocketOpcode.CONNECTION_CLOSE;
 				frame.closeStatus = WebSocketCloseStatus.NORMAL;
 				var buffer:ByteArray = new ByteArray();
+				frame.mask = true;
 				frame.send(buffer);
 				sendData(buffer, true);
 				
@@ -554,7 +559,7 @@ package com.worlize.websocket
 			text += "Connection: Upgrade\r\n";
 			text += "Sec-WebSocket-Key: " + base64nonce + "\r\n";
 			text += "Sec-Websocket-Origin: " + _origin + "\r\n";
-			text += "Sec-WebSocket-Version: 6\r\n";
+			text += "Sec-WebSocket-Version: 7\r\n";
 			if (protocol) {
 				text += "Sec-WebSocket-Protocol: " + protocol + "\r\n";
 			}

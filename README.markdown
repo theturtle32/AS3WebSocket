@@ -1,15 +1,15 @@
 ActionScript 3 WebSocket Client
 ===============================
 
-*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the -06 draft.*
+*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the -07 draft.*
 
 Explanation
 -----------
-THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent -06 draft.  Once the -07 draft is released I will update this client to work only with -07, and so on, until the final version of the protocol is ratified by the IETF.  I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
+THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent -07 draft.  Once the -08 draft is released I will update this client to work only with -08, and so on, until the final version of the protocol is ratified by the IETF.  I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
 
 I intend to keep this library updated to the latest draft of the IETF WebSocket protocol when new versions are released.  I built this library because I wanted to be able to make use of the latest draft of the protocol, but no browser implements it yet.
 
-See the [WebSocket Protocol draft specification](http://www.ietf.org/id/draft-ietf-hybi-thewebsocketprotocol-06.txt).
+See the [WebSocket Protocol draft specification](http://www.ietf.org/id/draft-ietf-hybi-thewebsocketprotocol-07.txt).
 
 
 The AS3WebSocket directory contains a Flash Builder 4 Library Project that contains the WebSocket client library.
@@ -24,7 +24,7 @@ Download
 
 Features
 --------
-- Based on -06 draft of the WebSocket protocol
+- Based on -07 draft of the WebSocket protocol
 - Support for deflate-stream extension
 - wss:// TLS support w/ hurlant as3crypto library
   - Learn more here: [as3crypto on Google Code](http://code.google.com/p/as3crypto/)

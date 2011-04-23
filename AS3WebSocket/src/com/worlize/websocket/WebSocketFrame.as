@@ -14,7 +14,7 @@ package com.worlize.websocket
 		public var rsv2:Boolean;
 		public var rsv3:Boolean;
 		public var opcode:int;
-		public var rsv4:Boolean;
+		public var mask:Boolean;
 		private var _length:int;
 		public var binaryPayload:ByteArray;
 		public var utf8Payload:String;
@@ -43,9 +43,13 @@ package com.worlize.websocket
 					rsv1   = Boolean(firstByte  & 0x40);
 					rsv2   = Boolean(firstByte  & 0x20);
 					rsv3   = Boolean(firstByte  & 0x10);
-					rsv4   = Boolean(secondByte & 0x80);
+					mask   = Boolean(secondByte & 0x80);
 					opcode = firstByte  & 0x0F;
 					_length = secondByte & 0x7F;
+					
+					if (mask) {
+						throw new Error("Received an illegal masked frame from the server.");
+					}
 					
 					if (_length === 126) {
 						parseState = WAITING_FOR_16_BIT_LENGTH;
@@ -166,23 +170,19 @@ package com.worlize.websocket
 			return _frameComplete;
 		}
 		
-		public function send(output:IDataOutput, useMask:Boolean = true):void {
-			var maskKey:uint;
+		public function send(output:IDataOutput):void {
 			var frameHeader:ByteArray = new ByteArray();
 			frameHeader.endian = Endian.BIG_ENDIAN;
 			
-			if (useMask) {
+			if (this.mask) {
 				// Generate a mask key
-				maskKey = Math.ceil(Math.random()*0xFFFFFFFF);
+				var maskKey:uint = Math.ceil(Math.random()*0xFFFFFFFF);
+				var maskBytes:Vector.<uint> = new Vector.<uint>(4);
+				maskBytes[0] = (maskKey >> 24) & 0xFF;
+				maskBytes[1] = (maskKey >> 16) & 0xFF;
+				maskBytes[2] = (maskKey >> 8)  & 0xFF;
+				maskBytes[3] =  maskKey        & 0xFF;
 			}
-			else {
-				maskKey = 0x00000000;
-			}
-			var maskBytes:Vector.<uint> = new Vector.<uint>(4);
-			maskBytes[0] = (maskKey >> 24) & 0xFF;
-			maskBytes[1] = (maskKey >> 16) & 0xFF;
-			maskBytes[2] = (maskKey >> 8)  & 0xFF;
-			maskBytes[3] =  maskKey        & 0xFF;
 			
 			var data:ByteArray;
 			
@@ -200,7 +200,7 @@ package com.worlize.websocket
 			if (rsv3) {
 				firstByte |= 0x10;
 			}
-			if (rsv4) {
+			if (mask) {
 				secondByte |= 0x80;
 			}
 			
@@ -247,37 +247,34 @@ package com.worlize.websocket
 				secondByte |= 127;
 			}
 			
-			// build the frame header
-			frameHeader.writeByte(firstByte);
-			frameHeader.writeByte(secondByte);
+			// output the frame header
+			output.writeByte(firstByte);
+			output.writeByte(secondByte);
 			
 			if (_length > 125 && _length <= 0xFFFF) {
 				// write 16-bit length
-				frameHeader.writeShort(_length);
+				output.writeShort(_length);
 			}
 			else if (_length > 0xFFFF) {
 				// write 64-bit length
-				frameHeader.writeUnsignedInt(0x00000000);
-				frameHeader.writeUnsignedInt(_length);
+				output.writeUnsignedInt(0x00000000);
+				output.writeUnsignedInt(_length);
 			}
 			
-			frameHeader.position = 0;
-			
-			// write the mask key to the output
-			output.writeUnsignedInt(maskKey);
-			
-			// Mask and send the header and payload
-			var i:uint,
-				j:int = 0,
-				headerLength:int = frameHeader.length;
-			
-			for (i = 0; i < headerLength; i ++) {
-				output.writeByte(frameHeader.readByte() ^ maskBytes[j]);
-				j = (j + 1) & 3;
+			if (this.mask) {
+				// write the mask key to the output	
+				output.writeUnsignedInt(maskKey);
+				// Mask and send the payload
+				var i:uint,
+				j:int = 0;
+				for (i = 0; i < _length; i ++) {
+					output.writeByte(data.readByte() ^ maskBytes[j]);
+					j = (j + 1) & 3;
+				}
 			}
-			for (i = 0; i < _length; i ++) {
-				output.writeByte(data.readByte() ^ maskBytes[j]);
-				j = (j + 1) & 3;
+			else {
+				// Send the payload unmasked
+				output.writeBytes(data, 0, data.length);
 			}
 		}
 	}
