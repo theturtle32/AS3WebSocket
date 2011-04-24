@@ -244,26 +244,18 @@ package com.worlize.websocket
 		public function sendUTF(data:String):void {
 			verifyConnectionForSend();
 			var frame:WebSocketFrame = new WebSocketFrame();
-			frame.fin = true;
 			frame.opcode = WebSocketOpcode.TEXT_FRAME;
 			frame.binaryPayload = new ByteArray();
 			frame.binaryPayload.writeMultiByte(data, 'utf-8');
-			frame.mask = true;
-			var buffer:ByteArray = new ByteArray();
-			frame.send(buffer);
-			sendData(buffer);
+			fragmentAndSend(frame);
 		}
 		
 		public function sendBytes(data:ByteArray):void {
 			verifyConnectionForSend();
 			var frame:WebSocketFrame = new WebSocketFrame();
-			frame.fin = true;
 			frame.opcode = WebSocketOpcode.BINARY_FRAME;
 			frame.binaryPayload = data;
-			frame.mask = true;
-			var buffer:ByteArray = new ByteArray();
-			frame.send(buffer);
-			sendData(buffer);
+			fragmentAndSend(frame);
 		}
 		
 		public function ping():void {
@@ -271,10 +263,7 @@ package com.worlize.websocket
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PING;
-			frame.mask = true;
-			var buffer:ByteArray = new ByteArray();
-			frame.send(buffer);
-			sendData(buffer);
+			sendFrame(frame);
 		}
 		
 		private function pong(binaryPayload:ByteArray = null):void {
@@ -283,6 +272,47 @@ package com.worlize.websocket
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PONG;
 			frame.binaryPayload = binaryPayload;
+			sendFrame(frame);
+		}
+		
+		private function fragmentAndSend(frame:WebSocketFrame):void {
+			if (frame.opcode > 0x07) {
+				throw new WebSocketError("You cannot fragment control frames.");
+			}
+			
+			var threshold:uint = config.fragmentationThreshold;
+						
+			if (config.fragmentOutgoingMessages && frame.binaryPayload && frame.binaryPayload.length > threshold) {
+				frame.binaryPayload.position = 0;
+				var length:int = frame.binaryPayload.length;
+				var numFragments:int = Math.ceil(length / threshold);
+				for (var i:int = 1; i <= numFragments; i++) {
+					var currentFrame:WebSocketFrame = new WebSocketFrame();
+					
+					// continuation opcode except for first frame.
+					currentFrame.opcode = (i === 1) ? frame.opcode : 0x00;
+					
+					// fin set on last frame only
+					currentFrame.fin = (i === numFragments);
+					
+					// length is likely to be shorter on the last fragment
+					var currentLength:int = (i === numFragments) ? length - (threshold * (i-1)) : threshold;
+					frame.binaryPayload.position  = threshold * (i-1);
+					
+					// Slice the right portion of the original payload
+					currentFrame.binaryPayload = new ByteArray();
+					frame.binaryPayload.readBytes(currentFrame.binaryPayload, 0, currentLength);
+					
+					sendFrame(currentFrame);
+				}
+			}
+			else {
+				frame.fin = true;
+				sendFrame(frame);
+			}
+		}
+		
+		private function sendFrame(frame:WebSocketFrame):void {
 			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
