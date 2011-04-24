@@ -2,6 +2,7 @@
 <flexLibProperties includeAllClasses="true" version="3">
   <includeClasses>
     <classEntry path="com.worlize.websocket.WebSocketErrorEvent"/>
+    <classEntry path="com.worlize.websocket.WebSocketConfig"/>
   </includeClasses>
   <includeResources/>
   <namespaceManifests/>

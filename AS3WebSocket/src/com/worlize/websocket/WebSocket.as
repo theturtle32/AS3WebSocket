@@ -25,6 +25,8 @@ package com.worlize.websocket
 	import flash.utils.IDataInput;
 	import flash.utils.Timer;
 	
+	import flashx.textLayout.debug.assert;
+	
 	import mx.utils.Base64Encoder;
 	import mx.utils.URLUtil;
 	
@@ -84,6 +86,8 @@ package com.worlize.websocket
 			new URIEncodingBitmap(URI.URIpathEscape);
 		
 		public var enableDeflateStream:Boolean = true;
+		
+		public var config:WebSocketConfig = new WebSocketConfig();
 		
 		public static var debug:Boolean = true;
 		
@@ -242,7 +246,8 @@ package com.worlize.websocket
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.TEXT_FRAME;
-			frame.utf8Payload = data;
+			frame.binaryPayload = new ByteArray();
+			frame.binaryPayload.writeMultiByte(data, 'utf-8');
 			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
@@ -272,11 +277,12 @@ package com.worlize.websocket
 			sendData(buffer);
 		}
 		
-		private function pong():void {
+		private function pong(binaryPayload:ByteArray = null):void {
 			verifyConnectionForSend();
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PONG;
+			frame.binaryPayload = binaryPayload;
 			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
@@ -397,7 +403,12 @@ package com.worlize.websocket
 
 			// addData returns true if the frame is complete, and false
 			// if more data is needed.
-			while (currentFrame.addData(incomingBuffer, fragmentationOpcode)) {
+			while (currentFrame.addData(incomingBuffer, fragmentationOpcode, config)) {
+				if (!config.assembleFragments) {
+					var frameEvent:WebSocketEvent = new WebSocketEvent(WebSocketEvent.FRAME);
+					frameEvent.frame = currentFrame;
+					dispatchEvent(frameEvent);
+				}
 				processFrame(currentFrame);
 				currentFrame = new WebSocketFrame();
 			}
@@ -435,9 +446,11 @@ package com.worlize.websocket
 						dispatchEvent(event);
 					}
 					else if (frameQueue.length === 0) {
-						// beginning of a fragmented message
-						frameQueue.push(frame);
-						fragmentationOpcode = frame.opcode;
+						if (config.assembleFragments) {
+							// beginning of a fragmented message
+							frameQueue.push(frame);
+							fragmentationOpcode = frame.opcode;
+						}
 					}
 					else {
 						throw new WebSocketError("Illegal BINARY_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
@@ -448,31 +461,42 @@ package com.worlize.websocket
 						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
 						event.message = new WebSocketMessage();
 						event.message.type = WebSocketMessage.TYPE_UTF8;
-						event.message.utf8Data = frame.utf8Payload;
+						event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.length, 'utf-8');
 						dispatchEvent(event);
 					}
 					else if (frameQueue.length === 0) {
-						// beginning of a fragmented message
-						frameQueue.push(frame);
-						fragmentationOpcode = frame.opcode;
+						if (config.assembleFragments) {
+							// beginning of a fragmented message
+							frameQueue.push(frame);
+							fragmentationOpcode = frame.opcode;
+						}
 					}
 					else {
 						throw new WebSocketError("Illegal TEXT_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
 					}
 					break;
 				case WebSocketOpcode.CONTINUATION:
+					if (!config.assembleFragments) {
+						return;
+					}
 					frameQueue.push(frame);
 					if (frame.fin) {
 						// end of fragmented message, so we process the whole
-						// message now.  The data for fragmented text frames
-						// is collected as binary chunks so that we can decode
-						// the utf-8 data when we have all the data.  This is
-						// done because the fragmentation boundary may occur
-						// in the middle of a multi-byte utf-8 character.
+						// message now.  We also have to decode the utf-8 data
+						// for text frames after combining all the fragments.
 						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
 						event.message = new WebSocketMessage();
 						var messageOpcode:int = frameQueue[0].opcode;
 						var binaryData:ByteArray = new ByteArray();
+						var totalLength:int = 0;
+						for (i=0; i < frameQueue.length; i++) {
+							totalLength += frameQueue[i].length;
+						}
+						if (totalLength > config.maxMessageSize) {
+							throw new WebSocketError("Message size of " + totalLength +
+								" bytes exceeds maximum accepted message size of " +
+								config.maxMessageSize + " bytes.");
+						}
 						for (i=0; i < frameQueue.length; i++) {
 							currentFrame = frameQueue[i];
 							binaryData.writeBytes(
@@ -492,6 +516,8 @@ package com.worlize.websocket
 								event.message.type = WebSocketMessage.TYPE_UTF8;
 								event.message.utf8Data = binaryData.readMultiByte(binaryData.length, 'utf-8');
 								break;
+							default:
+								throw new WebSocketError("Unexpected first opcode in fragmentation sequence: 0x" + messageOpcode.toString(16));
 						}
 						frameQueue = new Vector.<WebSocketFrame>();
 						fragmentationOpcode = 0;
@@ -502,7 +528,7 @@ package com.worlize.websocket
 					if (debug) {
 						logger("Received Ping");
 					}
-					pong();
+					pong(frame.binaryPayload);
 					break;
 				case WebSocketOpcode.PONG:
 					if (debug) {

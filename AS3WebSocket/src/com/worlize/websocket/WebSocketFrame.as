@@ -17,7 +17,6 @@ package com.worlize.websocket
 		public var mask:Boolean;
 		private var _length:int;
 		public var binaryPayload:ByteArray;
-		public var utf8Payload:String;
 		public var closeStatus:int;
 		
 		private static const NEW_FRAME:int = 0;
@@ -33,7 +32,7 @@ package com.worlize.websocket
 		}
 		
 		// Returns true if frame is complete, false if waiting for more data
-		public function addData(input:IDataInput, fragmentationType:int):Boolean {
+		public function addData(input:IDataInput, fragmentationType:int, config:WebSocketConfig):Boolean {
 			if (input.bytesAvailable >= 2) { // minimum frame size
 				if (parseState === NEW_FRAME) {
 					var firstByte:int = input.readByte();
@@ -81,71 +80,25 @@ package com.worlize.websocket
 					}
 				}
 				if (parseState === WAITING_FOR_PAYLOAD) {
-					if (
-						// frame is the first frame in a fragmentation sequence
-						((opcode === WebSocketOpcode.TEXT_FRAME ||
-						  opcode === WebSocketOpcode.BINARY_FRAME) && !fin) ||
-
-						// Or frame is a binary frame
-						opcode === WebSocketOpcode.BINARY_FRAME ||
-						
-						// Or frame is a continuation frame
-						opcode === WebSocketOpcode.CONTINUATION) {
-						// If the frame has a CONTINUATION opcode, we have to use
-						// the opcode from the first fragmented frame.  Only text
-						// and binary frames can be fragmented.
-						// Also, fragmented text frames must be read as binary,
-						// because the frame boundary may occur in the middle of
-						// a utf-8 character.  We'll decode the utf-8 data when
-						// all is said and done.
+					if (_length > config.maxReceivedFrameSize) {
+						throw new IOError("Received frame size of " + _length + 
+										  "exceeds maximum accepted frame size of " + config.maxReceivedFrameSize);
+					}
+					if (opcode === 0x00 && fragmentationType === 0x00) {
+						throw new IOError("Received unexpected continuation frame.");
+					}
+					else {
+						if (_length === 0) {
+							parseState = COMPLETE;
+							return true;
+						}
 						if (input.bytesAvailable >= _length) {
 							binaryPayload = new ByteArray();
 							binaryPayload.endian = Endian.BIG_ENDIAN;
 							input.readBytes(binaryPayload, 0, _length);
+							binaryPayload.position = 0;
 							parseState = COMPLETE;
-							_frameComplete = true;
-							return _frameComplete;
-						}
-					}
-					else {
-						switch (opcode) {
-							case WebSocketOpcode.TEXT_FRAME:
-								if (input.bytesAvailable >= _length) {
-									utf8Payload = input.readMultiByte(_length, 'utf-8');
-									parseState = COMPLETE;
-									_frameComplete = true;
-									return _frameComplete;
-								}
-								break;
-							
-							case WebSocketOpcode.PING:
-								if (WebSocket.debug) {
-									WebSocket.logger("Ping!")
-								}
-								throwAwayPayload(input);
-								break;
-							
-							case WebSocketOpcode.PONG:
-								if (WebSocket.debug) {
-									WebSocket.logger("Pong!");
-								}
-								throwAwayPayload(input);
-								break;
-							
-							case WebSocketOpcode.CONNECTION_CLOSE:
-								if (WebSocket.debug) {
-									WebSocket.logger("Close Requested.");
-								}
-								throwAwayPayload(input);
-								break;
-							
-							default:
-								// unknown frame... eat up any data and move on.
-								if (WebSocket.debug) {
-									WebSocket.logger("Unknown frame!");
-								}
-								throwAwayPayload(input);
-								break;
+							return true;
 						}
 					}
 				}
@@ -206,7 +159,7 @@ package com.worlize.websocket
 			
 			firstByte |= (opcode & 0x0F);
 			
-			if (opcode === WebSocketOpcode.BINARY_FRAME) {
+			if (binaryPayload) {
 				data = binaryPayload;
 				data.position = 0;
 				_length = data.length;
@@ -215,18 +168,9 @@ package com.worlize.websocket
 				data = new ByteArray();
 				data.endian = Endian.BIG_ENDIAN;
 				data.writeShort(closeStatus);
-				if (utf8Payload) {
-					data.writeMultiByte(utf8Payload, 'utf-8');
+				if (binaryPayload) {
+					data.writeBytes(binaryPayload, 0, binaryPayload.length);
 				}
-				data.position = 0;
-				_length = data.length;
-			}
-			else if (utf8Payload) { // text, ping, and pong frames
-				// According to the spec, ping and pong frames
-				// can optionally carry a payload.
-				data = new ByteArray();
-				data.endian = Endian.BIG_ENDIAN;
-				data.writeMultiByte(utf8Payload, 'utf-8');
 				data.position = 0;
 				_length = data.length;
 			}
