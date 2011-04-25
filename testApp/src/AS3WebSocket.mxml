@@ -45,6 +45,7 @@
 				websocket = new WebSocket("ws://localhost", "*");
 				loadSettings();
 				var scrollToBottomTimer:Number = NaN;
+				WebSocket.debug = true;
 				WebSocket.logger = function(text:String):void {
 					trace(text);
 					log += (text + "\n");

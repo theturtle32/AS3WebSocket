@@ -89,10 +89,10 @@ package com.worlize.websocket
 		
 		public var config:WebSocketConfig = new WebSocketConfig();
 		
-		public static var debug:Boolean = true;
+		public static var debug:Boolean = false;
 		
 		public static var logger:Function = function(text:String):void {
-			logger(text);
+			trace(text);
 		};
 		
 		public function WebSocket(uri:String, origin:String, protocol:String = null, timeout:uint = 10000)
@@ -801,7 +801,7 @@ package com.worlize.websocket
 		}
 		
 		private function parseHTTPHeader(line:String):Object {
-			var header:Array = line.split(/\: */);
+			var header:Array = line.split(/\: +/);
 			return header.length === 2 ? {
 				name: header[0],
 				value: header[1]

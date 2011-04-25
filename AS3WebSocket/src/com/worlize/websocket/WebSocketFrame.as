@@ -89,6 +89,7 @@ package com.worlize.websocket
 					}
 					else {
 						if (_length === 0) {
+							binaryPayload = new ByteArray();
 							parseState = COMPLETE;
 							return true;
 						}
