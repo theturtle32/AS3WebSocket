@@ -578,7 +578,6 @@ package com.worlize.websocket
 					}
 					else {
 						close(false);
-						dispatchClosedEvent();
 					}
 					break;
 				default:
@@ -866,9 +865,11 @@ package com.worlize.websocket
 			if (handshakeTimer.running) {
 				handshakeTimer.stop();
 			}
-			_readyState = WebSocketState.CLOSED;
-			var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.CLOSED);
-			dispatchEvent(event);
+			if (_readyState !== WebSocketState.CLOSED) {
+				_readyState = WebSocketState.CLOSED;
+				var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.CLOSED);
+				dispatchEvent(event);
+			}
 		}
 				
 	}
