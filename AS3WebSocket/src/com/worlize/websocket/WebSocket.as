@@ -614,7 +614,7 @@ package com.worlize.websocket
 			text += "Connection: Upgrade\r\n";
 			text += "Sec-WebSocket-Key: " + base64nonce + "\r\n";
 			text += "Sec-Websocket-Origin: " + _origin + "\r\n";
-			text += "Sec-WebSocket-Version: 7\r\n";
+			text += "Sec-WebSocket-Version: 8\r\n";
 			if (protocol) {
 				text += "Sec-WebSocket-Protocol: " + protocol + "\r\n";
 			}

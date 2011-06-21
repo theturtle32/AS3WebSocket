@@ -24,7 +24,7 @@ Download
 
 Features
 --------
-- Based on -07 draft of the WebSocket protocol
+- Based on -09 draft of the WebSocket protocol
 - Support for deflate-stream extension
 - wss:// TLS support w/ hurlant as3crypto library
   - Learn more here: [as3crypto on Google Code](http://code.google.com/p/as3crypto/)
