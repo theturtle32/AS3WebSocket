@@ -460,8 +460,6 @@ package com.worlize.websocket
 		}
 		
 		private function processFrame(frame:WebSocketFrame):void {
-			// for now just publish the message, ignoring fragmentation etc.
-			// frameQueue.push(frame);
 			var event:WebSocketEvent;
 			var i:int;
 			var currentFrame:WebSocketFrame;
