@@ -19,7 +19,7 @@ The testApp directory contains a Flash Builder 4 Air Project that uses the AS3We
 
 Download
 --------
-- The Adobe Air test application is available under the "Downloads" section above.
+- The Adobe Air test application and the client library in SWC format are both available under the "Downloads" section above.
 
 
 Features
