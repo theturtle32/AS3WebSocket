@@ -5,7 +5,7 @@ ActionScript 3 WebSocket Client
 
 Explanation
 -----------
-THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent -07 draft.  Once the -08 draft is released I will update this client to work only with -08, and so on, until the final version of the protocol is ratified by the IETF.  I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
+THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent -09 draft.  Once the next draft is released I will update this client to work only with that version, and so on, until the final version of the protocol is ratified by the IETF.  I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
 
 I intend to keep this library updated to the latest draft of the IETF WebSocket protocol when new versions are released.  I built this library because I wanted to be able to make use of the latest draft of the protocol, but no browser implements it yet.
 
