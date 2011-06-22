@@ -108,6 +108,8 @@ package com.worlize.websocket
 		
 		private function init():void {
 			parseUrl();
+			
+			validateProtocol();
 
 			closeTimer = new Timer(closeTimeout, 1);
 			closeTimer.addEventListener(TimerEvent.TIMER, handleCloseTimer);
@@ -135,6 +137,24 @@ package com.worlize.websocket
 			socket.addEventListener(ProgressEvent.SOCKET_DATA, handleSocketData);
 			
 			_readyState = WebSocketState.INIT;
+		}
+		
+		private function validateProtocol():void {
+			if (_protocol) {
+				var separators:Array = [
+					"(", ")", "<", ">", "@",
+					",", ";", ":", "\\", "\"",
+					"/", "[", "]", "?", "=",
+					"{", "}", " ", String.fromCharCode(9)
+				];
+				for (var i:int = 0; i < _protocol.length; i++) {
+					var charCode:int = _protocol.charCodeAt(i);
+					var char:String = _protocol.charAt(i);
+					if (charCode < 0x21 || charCode > 0x7E || separators.indexOf(char) !== -1) {
+						throw new WebSocketError("Illegal character '" + String.fromCharCode(char) + "' in subprotocol.");
+					}
+				}
+			}
 		}
 		
 		public function connect():void {
