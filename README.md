@@ -1,7 +1,7 @@
 ActionScript 3 WebSocket Client
 ===============================
 
-*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the -07 draft.*
+*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the -09 draft.*
 
 Explanation
 -----------
@@ -9,7 +9,7 @@ THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deploye
 
 I intend to keep this library updated to the latest draft of the IETF WebSocket protocol when new versions are released.  I built this library because I wanted to be able to make use of the latest draft of the protocol, but no browser implements it yet.
 
-See the [WebSocket Protocol draft specification](http://www.ietf.org/id/draft-ietf-hybi-thewebsocketprotocol-07.txt).
+See the [WebSocket Protocol draft specification](http://www.ietf.org/id/draft-ietf-hybi-thewebsocketprotocol-09.txt).
 
 
 The AS3WebSocket directory contains a Flash Builder 4 Library Project that contains the WebSocket client library.
