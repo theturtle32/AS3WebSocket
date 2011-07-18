@@ -32,6 +32,7 @@ package com.worlize.websocket
 	
 	[Event(name="connectionFail",type="com.worlize.websocket.WebSocketErrorEvent")]
 	[Event(name="message",type="com.worlize.websocket.WebSocketEvent")]
+	[Event(name="frame",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="open",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="closed",type="com.worlize.websocket.WebSocketEvent")]
 	public class WebSocket extends EventDispatcher
@@ -56,6 +57,8 @@ package com.worlize.websocket
 		private var socket:Socket;
 		private var timeout:uint;
 		
+		private var fatalError:Boolean = false;
+		
 		private var nonce:ByteArray;
 		private var base64nonce:String;
 		private var serverHandshakeResponse:String;
@@ -63,6 +66,7 @@ package com.worlize.websocket
 		private var currentFrame:WebSocketFrame;
 		private var frameQueue:Vector.<WebSocketFrame>;
 		private var fragmentationOpcode:int = 0;
+		private var fragmentationSize:uint = 0;
 		
 		private var waitingForServerClose:Boolean = false;
 		private var closeTimeout:int = 5000;
@@ -110,7 +114,13 @@ package com.worlize.websocket
 			parseUrl();
 			
 			validateProtocol();
+			
+			frameQueue = new Vector.<WebSocketFrame>();
+			fragmentationOpcode = 0x00;
+			fragmentationSize = 0;
 
+			fatalError = false;
+			
 			closeTimer = new Timer(closeTimeout, 1);
 			closeTimer.addEventListener(TimerEvent.TIMER, handleCloseTimer);
 			
@@ -332,7 +342,7 @@ package com.worlize.websocket
 			}
 		}
 		
-		private function sendFrame(frame:WebSocketFrame):void {
+		private function sendFrame(frame:WebSocketFrame, force:Boolean = false):void {
 			frame.mask = true;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
@@ -447,13 +457,21 @@ package com.worlize.websocket
 					zstreamIn.next_out.clear();
 				}
 				else {
-					socket.readBytes(incomingBuffer, incomingBuffer.position, socket.bytesAvailable);
+					socket.readBytes(incomingBuffer, incomingBuffer.length, socket.bytesAvailable);
 				}
 			}
 
 			// addData returns true if the frame is complete, and false
 			// if more data is needed.
-			while (currentFrame.addData(incomingBuffer, fragmentationOpcode, config)) {
+			while (currentFrame.addData(incomingBuffer, fragmentationOpcode, config) && !fatalError) {
+				if (currentFrame.protocolError) {
+					drop(WebSocketCloseStatus.PROTOCOL_ERROR, currentFrame.dropReason);
+					return;
+				}
+				else if (currentFrame.frameTooLarge) {
+					drop(WebSocketCloseStatus.MESSAGE_TOO_LARGE, currentFrame.dropReason);
+					return;
+				}
 				if (!config.assembleFragments) {
 					var frameEvent:WebSocketEvent = new WebSocketEvent(WebSocketEvent.FRAME);
 					frameEvent.frame = currentFrame;
@@ -468,10 +486,10 @@ package com.worlize.websocket
 				// the used data and reset the buffer to contain only the
 				// new, unused data.
 				var tempBuffer:ByteArray = new ByteArray();
-				incomingBuffer.readBytes(tempBuffer, 0, incomingBuffer.bytesAvailable);
+				incomingBuffer.readBytes(tempBuffer);
+				tempBuffer.position = 0;
 				incomingBuffer.clear();
-				tempBuffer.readBytes(incomingBuffer, 0, tempBuffer.bytesAvailable);
-				tempBuffer.clear();
+				incomingBuffer = tempBuffer;
 			}
 			else {
 				incomingBuffer.clear();
@@ -486,90 +504,106 @@ package com.worlize.websocket
 
 			switch (frame.opcode) {
 				case WebSocketOpcode.BINARY_FRAME:
-					if (frame.fin) {
-						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
-						event.message = new WebSocketMessage();
-						event.message.type = WebSocketMessage.TYPE_BINARY;
-						event.message.binaryData = frame.binaryPayload;
-						dispatchEvent(event);
-					}
-					else if (frameQueue.length === 0) {
-						if (config.assembleFragments) {
+					if (config.assembleFragments) {
+						if (frame.fin) {
+							event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+							event.message = new WebSocketMessage();
+							event.message.type = WebSocketMessage.TYPE_BINARY;
+							event.message.binaryData = frame.binaryPayload;
+							dispatchEvent(event);
+						}
+						else if (frameQueue.length === 0) {
 							// beginning of a fragmented message
 							frameQueue.push(frame);
 							fragmentationOpcode = frame.opcode;
 						}
-					}
-					else {
-						throw new WebSocketError("Illegal BINARY_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+						else {
+							throw new WebSocketError("Illegal BINARY_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+						}						
 					}
 					break;
 				case WebSocketOpcode.TEXT_FRAME:
-					if (frame.fin) {
-						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
-						event.message = new WebSocketMessage();
-						event.message.type = WebSocketMessage.TYPE_UTF8;
-						event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.length, 'utf-8');
-						dispatchEvent(event);
-					}
-					else if (frameQueue.length === 0) {
-						if (config.assembleFragments) {
+					if (config.assembleFragments) {
+						if (frame.fin) {
+							event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+							event.message = new WebSocketMessage();
+							event.message.type = WebSocketMessage.TYPE_UTF8;
+							event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.length, 'utf-8');
+							dispatchEvent(event);
+						}
+						else if (frameQueue.length === 0) {
 							// beginning of a fragmented message
 							frameQueue.push(frame);
 							fragmentationOpcode = frame.opcode;
 						}
-					}
-					else {
-						throw new WebSocketError("Illegal TEXT_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+						else {
+							throw new WebSocketError("Illegal TEXT_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+						}
 					}
 					break;
 				case WebSocketOpcode.CONTINUATION:
-					if (!config.assembleFragments) {
-						return;
-					}
-					frameQueue.push(frame);
-					if (frame.fin) {
-						// end of fragmented message, so we process the whole
-						// message now.  We also have to decode the utf-8 data
-						// for text frames after combining all the fragments.
-						event = new WebSocketEvent(WebSocketEvent.MESSAGE);
-						event.message = new WebSocketMessage();
-						var messageOpcode:int = frameQueue[0].opcode;
-						var binaryData:ByteArray = new ByteArray();
-						var totalLength:int = 0;
-						for (i=0; i < frameQueue.length; i++) {
-							totalLength += frameQueue[i].length;
+					if (config.assembleFragments) {
+						if (fragmentationOpcode === WebSocketOpcode.CONTINUATION &&
+							frame.opcode        === WebSocketOpcode.CONTINUATION)
+						{
+							drop(WebSocketCloseStatus.PROTOCOL_ERROR,
+									"Unexpected continuation frame.");
+							return;
+						} 
+						
+						fragmentationSize += frame.length;
+						
+						if (fragmentationSize > config.maxMessageSize) {
+							drop(WebSocketCloseStatus.MESSAGE_TOO_LARGE, "Maximum message size exceeded.");
+							return;
 						}
-						if (totalLength > config.maxMessageSize) {
-							throw new WebSocketError("Message size of " + totalLength +
-								" bytes exceeds maximum accepted message size of " +
-								config.maxMessageSize + " bytes.");
+						
+						frameQueue.push(frame);
+						
+						if (frame.fin) {
+							// end of fragmented message, so we process the whole
+							// message now.  We also have to decode the utf-8 data
+							// for text frames after combining all the fragments.
+							event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+							event.message = new WebSocketMessage();
+							var messageOpcode:int = frameQueue[0].opcode;
+							var binaryData:ByteArray = new ByteArray();
+							var totalLength:int = 0;
+							for (i=0; i < frameQueue.length; i++) {
+								totalLength += frameQueue[i].length;
+							}
+							if (totalLength > config.maxMessageSize) {
+								throw new WebSocketError("Message size of " + totalLength +
+									" bytes exceeds maximum accepted message size of " +
+									config.maxMessageSize + " bytes.");
+							}
+							for (i=0; i < frameQueue.length; i++) {
+								currentFrame = frameQueue[i];
+								binaryData.writeBytes(
+									currentFrame.binaryPayload,
+									0,
+									currentFrame.binaryPayload.length
+								);
+								currentFrame.binaryPayload.clear();
+							}
+							binaryData.position = 0;
+							switch (messageOpcode) {
+								case WebSocketOpcode.BINARY_FRAME:
+									event.message.type = WebSocketMessage.TYPE_BINARY;
+									event.message.binaryData = binaryData;
+									break;
+								case WebSocketOpcode.TEXT_FRAME:
+									event.message.type = WebSocketMessage.TYPE_UTF8;
+									event.message.utf8Data = binaryData.readMultiByte(binaryData.length, 'utf-8');
+									break;
+								default:
+									throw new WebSocketError("Unexpected first opcode in fragmentation sequence: 0x" + messageOpcode.toString(16));
+							}
+							frameQueue = new Vector.<WebSocketFrame>();
+							fragmentationOpcode = 0x00;
+							fragmentationSize = 0;
+							dispatchEvent(event);
 						}
-						for (i=0; i < frameQueue.length; i++) {
-							currentFrame = frameQueue[i];
-							binaryData.writeBytes(
-								currentFrame.binaryPayload,
-								0,
-								currentFrame.binaryPayload.length
-							);
-							currentFrame.binaryPayload.clear();
-						}
-						binaryData.position = 0;
-						switch (messageOpcode) {
-							case WebSocketOpcode.BINARY_FRAME:
-								event.message.type = WebSocketMessage.TYPE_BINARY;
-								event.message.binaryData = binaryData;
-								break;
-							case WebSocketOpcode.TEXT_FRAME:
-								event.message.type = WebSocketMessage.TYPE_UTF8;
-								event.message.utf8Data = binaryData.readMultiByte(binaryData.length, 'utf-8');
-								break;
-							default:
-								throw new WebSocketError("Unexpected first opcode in fragmentation sequence: 0x" + messageOpcode.toString(16));
-						}
-						frameQueue = new Vector.<WebSocketFrame>();
-						fragmentationOpcode = 0;
-						dispatchEvent(event);
 					}
 					break;
 				case WebSocketOpcode.PING:
@@ -602,6 +636,7 @@ package com.worlize.websocket
 					if (debug) {
 						logger("Unrecognized Opcode: 0x" + frame.opcode.toString(16));
 					}
+					drop(WebSocketCloseStatus.PROTOCOL_ERROR, "Unrecognized Opcode: 0x" + frame.opcode.toString(16));
 					break;
 			}
 		}
@@ -683,6 +718,36 @@ package com.worlize.websocket
 			
 			var event:WebSocketEvent = new WebSocketEvent(WebSocketEvent.CLOSED);
 			dispatchEvent(event);
+		}
+		
+		private function drop(closeReason:uint = WebSocketCloseStatus.PROTOCOL_ERROR, reasonText:String = null):void {
+			if (!connected) {
+				return;
+			}
+			fatalError = true;
+			var logText:String = "WebSocket: Dropping Connection. Code: " + closeReason.toString(10);
+			if (reasonText) {
+				logText += (" - " + reasonText);;
+			}
+			logger(logText);
+			
+			frameQueue = new Vector.<WebSocketFrame>();
+			fragmentationSize = 0;
+			sendCloseFrame(closeReason, reasonText, true);
+			dispatchClosedEvent();
+			socket.close();				
+		}
+		
+		private function sendCloseFrame(reasonCode:uint = WebSocketCloseStatus.NORMAL, reasonText:String = null, force:Boolean = false):void {
+			var frame:WebSocketFrame = new WebSocketFrame();
+			frame.fin = true;
+			frame.opcode = WebSocketOpcode.CONNECTION_CLOSE;
+			frame.closeStatus = reasonCode;
+			if (reasonText) {
+				frame.binaryPayload = new ByteArray();
+				frame.binaryPayload.writeUTFBytes(reasonText);
+			}
+			sendFrame(frame, force);
 		}
 		
 		private function readServerHandshake():void {

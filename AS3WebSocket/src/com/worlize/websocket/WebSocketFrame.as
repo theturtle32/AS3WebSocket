@@ -19,13 +19,16 @@ package com.worlize.websocket
 		public var binaryPayload:ByteArray;
 		public var closeStatus:int;
 		
+		public var protocolError:Boolean = false;
+		public var frameTooLarge:Boolean = false;
+		public var dropReason:String;
+		
 		private static const NEW_FRAME:int = 0;
 		private static const WAITING_FOR_16_BIT_LENGTH:int = 1;
 		private static const WAITING_FOR_64_BIT_LENGTH:int = 2;
 		private static const WAITING_FOR_PAYLOAD:int = 3;
 		private static const COMPLETE:int = 4;
 		private var parseState:int = 0; // Initialize as NEW_FRAME
-		private var _frameComplete:Boolean = false;
 		
 		public function get length():int {
 			return _length;
@@ -47,7 +50,9 @@ package com.worlize.websocket
 					_length = secondByte & 0x7F;
 					
 					if (mask) {
-						throw new Error("Received an illegal masked frame from the server.");
+						protocolError = true;
+						dropReason = "Received an illegal masked frame from the server.";
+						return true;
 					}
 					
 					if (_length === 126) {
@@ -73,7 +78,9 @@ package com.worlize.websocket
 						// 32 bits and hope for the best.
 						var firstHalf:uint = input.readUnsignedInt();
 						if (firstHalf > 0) {
-							throw new IOError("Unsupported 64-bit length frame received.");
+							frameTooLarge = true;
+							dropReason = "Unsupported 64-bit length frame received.";
+							return true;
 						}
 						_length = input.readUnsignedInt();
 						parseState = WAITING_FOR_PAYLOAD;
@@ -81,11 +88,10 @@ package com.worlize.websocket
 				}
 				if (parseState === WAITING_FOR_PAYLOAD) {
 					if (_length > config.maxReceivedFrameSize) {
-						throw new IOError("Received frame size of " + _length + 
-										  "exceeds maximum accepted frame size of " + config.maxReceivedFrameSize);
-					}
-					if (opcode === 0x00 && fragmentationType === 0x00) {
-						throw new IOError("Received unexpected continuation frame.");
+						frameTooLarge = true;
+						dropReason = "Received frame size of " + _length + 
+									 "exceeds maximum accepted frame size of " + config.maxReceivedFrameSize;
+						return true;
 					}
 					else {
 						if (_length === 0) {
@@ -107,7 +113,7 @@ package com.worlize.websocket
 			// If more data is needed but not available on the socket yet,
 			// return false.  If there is enough data and the frame parsing
 			// has been completed, return true.
-			return _frameComplete;
+			return false;
 		}
 		
 		private function throwAwayPayload(input:IDataInput):void {
@@ -116,12 +122,7 @@ package com.worlize.websocket
 					input.readByte();
 				}
 				parseState = COMPLETE;
-				_frameComplete = true;
 			}
-		}
-		
-		public function get frameComplete():Boolean {
-			return _frameComplete;
 		}
 		
 		public function send(output:IDataOutput):void {
@@ -160,18 +161,19 @@ package com.worlize.websocket
 			
 			firstByte |= (opcode & 0x0F);
 			
-			if (binaryPayload) {
-				data = binaryPayload;
-				data.position = 0;
-				_length = data.length;
-			}
-			else if (opcode === WebSocketOpcode.CONNECTION_CLOSE) {
+			if (opcode === WebSocketOpcode.CONNECTION_CLOSE) {
 				data = new ByteArray();
 				data.endian = Endian.BIG_ENDIAN;
 				data.writeShort(closeStatus);
 				if (binaryPayload) {
-					data.writeBytes(binaryPayload, 0, binaryPayload.length);
+					binaryPayload.position = 0;
+					data.writeBytes(binaryPayload);
 				}
+				data.position = 0;
+				_length = data.length;
+			}
+			else if (binaryPayload) {
+				data = binaryPayload;
 				data.position = 0;
 				_length = data.length;
 			}
