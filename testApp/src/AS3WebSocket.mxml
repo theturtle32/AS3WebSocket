@@ -118,6 +118,9 @@
 				WebSocket.logger("Websocket closed.");
 				disconnectButton.enabled = false;
 				connectButton.enabled = true;
+				if (websocket.protocol === 'lws-mirror-protocol') {
+					drawCanvas.graphics.clear();
+				}
 			}
 			
 			private function handleWebSocketOpen(event:WebSocketEvent):void {
@@ -128,34 +131,42 @@
 			private function handleWebSocketMessage(event:WebSocketEvent):void {
 				if (event.message.type === WebSocketMessage.TYPE_UTF8) {
 					if (websocket.protocol === 'lws-mirror-protocol') {
-						var command:String = event.message.utf8Data.charAt(0);
-						if (command === 'c' || command === 'd') {
-							var fields:Array = event.message.utf8Data.split(' ');
-							var color:uint = parseInt(String(fields[1]).slice(1), 16);
-							var startX:int = parseInt(fields[2], 10);
-							var startY:int = parseInt(fields[3], 10);
-							drawCanvas.graphics.lineStyle(1, color, 1, true, LineScaleMode.NORMAL, CapsStyle.SQUARE, JointStyle.MITER);
-							if (command === 'c') {
-								// c #7A9237 487 181 14;
-								var radius:int = parseInt(fields[4], 10);
-								drawCanvas.graphics.drawCircle(startX, startY, radius);
+						var commands:Array = event.message.utf8Data.split(';');
+						for each (var command:String in commands) {
+							if (command.length < 1) { continue; }
+							var fields:Array = command.split(' ');
+							var commandName:String = fields[0];
+							if (commandName === 'c' || commandName === 'd') {
+								var color:uint = parseInt(String(fields[1]).slice(1), 16);
+								var startX:int = parseInt(fields[2], 10);
+								var startY:int = parseInt(fields[3], 10);
+								drawCanvas.graphics.lineStyle(1, color, 1, true, LineScaleMode.NORMAL, CapsStyle.SQUARE, JointStyle.MITER);
+								if (commandName === 'c') {
+									// c #7A9237 487 181 14;
+									var radius:int = parseInt(fields[4], 10);
+									drawCanvas.graphics.drawCircle(startX, startY, radius);
+								}
+								else if (commandName === 'd') {
+									var endX:int = parseInt(fields[4], 10);
+									var endY:int = parseInt(fields[5], 10);
+									drawCanvas.graphics.moveTo(startX, startY);
+									drawCanvas.graphics.lineTo(endX, endY);
+								}
+								
 							}
-							else if (command === 'd') {
-								var endX:int = parseInt(fields[4], 10);
-								var endY:int = parseInt(fields[5], 10);
-								drawCanvas.graphics.moveTo(startX, startY);
-								drawCanvas.graphics.lineTo(endX, endY);
+							else if (commandName === 'clear') {
+								drawCanvas.graphics.clear();
 							}
-						}
-						else {
-							WebSocket.logger(event.message.utf8Data);
+							else {
+								WebSocket.logger("Unknown Command: '" + fields.join(' ') + "'");
+							}
 						}
 					}
 					else if (websocket.protocol === 'dumb-increment-protocol') {
 						dumbIncrementValue = parseInt(event.message.utf8Data, 10);
 					}
 					else {
-						WebSocket.logger(event.message.utf8Data);						
+						WebSocket.logger(event.message.utf8Data);
 					}
 				}
 				else if (event.message.type === WebSocketMessage.TYPE_BINARY) {
@@ -204,7 +215,9 @@
 			}
 			
 			private function clearCanvas():void {
-				drawCanvas.graphics.clear();
+				if (websocket.connected && websocket.protocol === 'lws-mirror-protocol') {
+					websocket.sendUTF('clear;');
+				}
 			}
 			
 			private function clearLog():void {

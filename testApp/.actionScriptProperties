@@ -19,6 +19,9 @@
         <airExclude path=".DS_Store"/>
       </airExcludes>
     </application>
+    <application path="FragmentationTest.mxml">
+      <airExcludes/>
+    </application>
   </applications>
   <modules/>
   <buildCSSFiles/>
