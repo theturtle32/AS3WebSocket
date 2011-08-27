@@ -399,7 +399,7 @@ package com.worlize.websocket
 
 			// addData returns true if the frame is complete, and false
 			// if more data is needed.
-			while (currentFrame.addData(socket, fragmentationOpcode, config) && !fatalError) {
+			while (socket.connected && currentFrame.addData(socket, fragmentationOpcode, config) && !fatalError) {
 				if (currentFrame.protocolError) {
 					drop(WebSocketCloseStatus.PROTOCOL_ERROR, currentFrame.dropReason);
 					return;
