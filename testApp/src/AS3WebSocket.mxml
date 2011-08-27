@@ -68,9 +68,6 @@
 			private function loadSettings():void {
 				var sharedObject:SharedObject = SharedObject.getLocal('settings');
 				urlField.text = sharedObject.data.url || 'ws://localhost:7681';
-				if ('enableDeflateStream' in sharedObject.data) {
-					enableDeflateStreamCheckBox.selected = sharedObject.data.enableDeflateStream;
-				}
 				if ('subprotocol' in sharedObject.data) {
 					protocolSelector.selectedItem = null;
 					protocolSelector.textInput.text = sharedObject.data.subprotocol;
@@ -80,7 +77,6 @@
 			private function saveSettings():void {
 				var sharedObject:SharedObject = SharedObject.getLocal('settings');
 				sharedObject.data.url = urlField.text;
-				sharedObject.data.enableDeflateStream = enableDeflateStreamCheckBox.selected;
 				sharedObject.data.subprotocol = protocolSelector.selectedIndex < 0 ? protocolSelector.textInput.text : protocolSelector.selectedItem['value'];
 				sharedObject.flush();
 			}
@@ -90,7 +86,6 @@
 				connectButton.enabled = false;
 				var subprotocol:String = protocolSelector.selectedIndex < 0 ? protocolSelector.textInput.text : protocolSelector.selectedItem['value'];
 				websocket = new WebSocket(urlField.text, "*", subprotocol, 5000);
-				websocket.enableDeflateStream = enableDeflateStreamCheckBox.selected;
 				websocket.connect();
 				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
 				websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
@@ -241,7 +236,6 @@
 		</s:HGroup>
 		<s:HGroup verticalAlign="middle"
 				  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
-			<s:CheckBox label="Enable deflate-stream" id="enableDeflateStreamCheckBox" selected="true" />
 			<s:Button id="disconnectButton" enabled="false" label="Disconnect" click="closeConnection();" />
 			<s:Button id="connectButton" label="Connect" click="openConnection();" />
 		</s:HGroup>

@@ -8,10 +8,6 @@ package com.worlize.websocket
 	import com.hurlant.crypto.tls.TLSSecurityParameters;
 	import com.hurlant.crypto.tls.TLSSocket;
 	import com.hurlant.util.Base64;
-	import com.wirelust.as3zlib.Deflate;
-	import com.wirelust.as3zlib.Inflate;
-	import com.wirelust.as3zlib.JZlib;
-	import com.wirelust.as3zlib.ZStream;
 	
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -72,20 +68,11 @@ package com.worlize.websocket
 		private var handshakeTimer:Timer;
 		private var handshakeTimeout:int = 5000;
 		
-		private var deflateStream:Boolean = false;
-		private var zstreamOut:ZStream;
-		private var zstreamIn:ZStream;
-		
-		private var incomingBuffer:ByteArray;
-		private var outgoingBuffer:ByteArray;
-		
 		private var tlsConfig:TLSConfig;
 		private var tlsSocket:TLSSocket;
 		
 		private var URIpathExcludedBitmap:URIEncodingBitmap =
 			new URIEncodingBitmap(URI.URIpathEscape);
-		
-		public var enableDeflateStream:Boolean = true;
 		
 		public var config:WebSocketConfig = new WebSocketConfig();
 		
@@ -346,28 +333,9 @@ package com.worlize.websocket
 		private function sendData(data:ByteArray, fullFlush:Boolean = false):void {
 			if (!connected) { return; }
 			data.position = 0;
-			if (deflateStream) {
-				zstreamOut.next_in = data;
-				zstreamOut.avail_in = data.bytesAvailable;
-				zstreamOut.next_in_index = 0;
-				zstreamOut.next_out = new ByteArray();
-				zstreamOut.next_out_index = 0;
-				zstreamOut.total_out = zstreamOut.avail_out = 0x7FFFFFFF;
-				var err:int = zstreamOut.deflate(fullFlush ? JZlib.Z_FULL_FLUSH : JZlib.Z_PARTIAL_FLUSH);
-				if (err === JZlib.Z_STREAM_ERROR) {
-					throw new Error("Zlib error deflate: " + err);
-				}
-				zstreamOut.next_out.position = 0;
-				socket.writeBytes(zstreamOut.next_out, 0, zstreamOut.next_out.length);
-				socket.flush();
-				zstreamOut.next_in.clear();
-				zstreamOut.next_out.clear();
-			}
-			else {
-				socket.writeBytes(data, 0, data.bytesAvailable);
-				socket.flush();
-				data.clear();
-			}
+			socket.writeBytes(data, 0, data.bytesAvailable);
+			socket.flush();
+			data.clear();
 		}
 		
 		public function close(waitForServer:Boolean = true):void {
@@ -398,7 +366,6 @@ package com.worlize.websocket
 				// connection, so we'll just close it.
 				if (socket.connected) {
 					socket.close();
-					destructDeflateStream();
 				}
 			}
 		}
@@ -430,34 +397,9 @@ package com.worlize.websocket
 				return;
 			}
 
-			if (socket.connected && socket.bytesAvailable > 0) {
-				if (deflateStream) {
-					zstreamIn.next_in = new ByteArray();
-					zstreamIn.avail_in = socket.bytesAvailable;
-					zstreamIn.next_in_index = 0;
-					socket.readBytes(zstreamIn.next_in, 0, socket.bytesAvailable);
-					zstreamIn.next_out = new ByteArray();
-					zstreamIn.next_out_index = 0;
-					zstreamIn.avail_out = 0x7FFFFFFF;
-					var err:int = zstreamIn.inflate(JZlib.Z_SYNC_FLUSH);
-					if (err === JZlib.Z_NEED_DICT ||
-						err === JZlib.Z_DATA_ERROR ||
-					 	err === JZlib.Z_MEM_ERROR) {
-						failConnection("Zlib error inflate: " + err);
-					}
-					zstreamIn.next_out.position = 0;
-					zstreamIn.next_out.readBytes(incomingBuffer, incomingBuffer.position, zstreamIn.next_out.bytesAvailable);
-					zstreamIn.next_in.clear();
-					zstreamIn.next_out.clear();
-				}
-				else {
-					socket.readBytes(incomingBuffer, incomingBuffer.length, socket.bytesAvailable);
-				}
-			}
-
 			// addData returns true if the frame is complete, and false
 			// if more data is needed.
-			while (currentFrame.addData(incomingBuffer, fragmentationOpcode, config) && !fatalError) {
+			while (currentFrame.addData(socket, fragmentationOpcode, config) && !fatalError) {
 				if (currentFrame.protocolError) {
 					drop(WebSocketCloseStatus.PROTOCOL_ERROR, currentFrame.dropReason);
 					return;
@@ -474,21 +416,6 @@ package com.worlize.websocket
 				processFrame(currentFrame);
 				currentFrame = new WebSocketFrame();
 			}
-			
-			if (incomingBuffer.bytesAvailable > 0) {
-				// If there is still unused data left in the buffer, delete
-				// the used data and reset the buffer to contain only the
-				// new, unused data.
-				var tempBuffer:ByteArray = new ByteArray();
-				incomingBuffer.readBytes(tempBuffer);
-				tempBuffer.position = 0;
-				incomingBuffer.clear();
-				incomingBuffer = tempBuffer;
-			}
-			else {
-				incomingBuffer.clear();
-			}
-			
 		}
 		
 		private function processFrame(frame:WebSocketFrame):void {
@@ -620,7 +547,6 @@ package com.worlize.websocket
 						closeTimer.stop();
 						waitingForServerClose = false;
 						socket.close();
-						destructDeflateStream();
 					}
 					else {
 						close(false);
@@ -666,10 +592,6 @@ package com.worlize.websocket
 				text += "Sec-WebSocket-Protocol: " + protocol + "\r\n";
 			}
 			// TODO: Handle Extensions
-			if (enableDeflateStream) {
-				var extension:String = "deflate-stream";
-				text += "Sec-WebSocket-Extensions: " + extension + "\r\n";
-			}
 			text += "\r\n";
 			
 			if (debug) {
@@ -851,19 +773,9 @@ package com.worlize.websocket
 			serverHandshakeResponse = null;
 			_readyState = WebSocketState.OPEN;
 			
-			if (serverExtensions.indexOf('deflate-stream') !== -1) {
-				initDeflateStream();
-			}
-			
 			// prepare for first frame
 			currentFrame = new WebSocketFrame();
 			frameQueue = new Vector.<WebSocketFrame>();
-			
-			// Initialize Stream Buffers
-			incomingBuffer = new ByteArray();
-			incomingBuffer.endian = Endian.BIG_ENDIAN;
-			outgoingBuffer = new ByteArray();
-			outgoingBuffer.endian = Endian.BIG_ENDIAN;
 			
 			dispatchEvent(new WebSocketEvent(WebSocketEvent.OPEN));
 			
@@ -896,46 +808,6 @@ package com.worlize.websocket
 				}
 			}
 			return false;
-		}
-		
-		private function initDeflateStream():void {
-			var err:int;
-			// JZlib and subsequently as3zlib only support a minimum window
-			// bits size of 9 for deflate, not 8 like C zlib.  So we'll use
-			// that I guess.  Had initially planned to use 8 because that's
-			// the value that Andy Green's libwebsockets C library uses.
-			var windowBitsOut:int = 9;
-			var windowBitsIn:int = 8;
-			
-			deflateStream = true;
-			zstreamOut = new ZStream();
-			zstreamIn = new ZStream();
-			
-			err = zstreamOut.deflateInitWithIntIntBoolean(JZlib.Z_BEST_SPEED, windowBitsOut, true);
-			if (err !== JZlib.Z_OK) {
-				failConnection("Error calling deflateInitWithIntIntBoolean() - " + err);
-			}
-			
-			err = zstreamIn.inflateInitWithWbitsNoWrap(windowBitsIn, true);
-			if (err !== JZlib.Z_OK) {
-				failConnection("Error calling inflateInitWithWbitsNoWrap() - " + err);
-			}
-			
-			if (debug) {
-				logger("ZLib constructed");
-			}
-		}
-		
-		private function destructDeflateStream():void {
-			if (deflateStream) {
-				zstreamIn.inflateEnd();
-				zstreamOut.deflateEnd();
-				zstreamIn = null;
-				zstreamOut = null;
-				if (debug) {
-					logger("ZLib destructed");
-				}
-			}
 		}
 		
 		private function dispatchClosedEvent():void {

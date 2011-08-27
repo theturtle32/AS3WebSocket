@@ -1,9 +1,8 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<flexLibProperties includeAllClasses="true" version="3">
+<flexLibProperties includeAllClasses="true" useMultiPlatformConfig="false" version="3">
   <includeClasses>
     <classEntry path="com.worlize.websocket.WebSocketErrorEvent"/>
     <classEntry path="com.worlize.websocket.WebSocketConfig"/>
-    <classEntry path="com.adobe.utils.Base64Encoder"/>
   </includeClasses>
   <includeResources/>
   <namespaceManifests/>
