@@ -445,7 +445,9 @@ package com.worlize.websocket
 							fragmentationOpcode = frame.opcode;
 						}
 						else {
-							throw new WebSocketError("Illegal BINARY_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+							drop(WebSocketCloseStatus.PROTOCOL_ERROR,
+								 "Illegal BINARY_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+							return;
 						}						
 					}
 					break;
@@ -464,7 +466,9 @@ package com.worlize.websocket
 							fragmentationOpcode = frame.opcode;
 						}
 						else {
-							throw new WebSocketError("Illegal TEXT_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+							drop(WebSocketCloseStatus.PROTOCOL_ERROR,
+								 "Illegal TEXT_FRAME received in the middle of a fragmented message.  Expected a continuation or control frame.");
+							return;
 						}
 					}
 					break;
@@ -476,7 +480,7 @@ package com.worlize.websocket
 							drop(WebSocketCloseStatus.PROTOCOL_ERROR,
 									"Unexpected continuation frame.");
 							return;
-						} 
+						}
 						
 						fragmentationSize += frame.length;
 						
