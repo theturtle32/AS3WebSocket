@@ -3,6 +3,7 @@
   <includeClasses>
     <classEntry path="com.worlize.websocket.WebSocketErrorEvent"/>
     <classEntry path="com.worlize.websocket.WebSocketConfig"/>
+    <classEntry path="com.adobe.utils.Base64Encoder"/>
   </includeClasses>
   <includeResources/>
   <namespaceManifests/>

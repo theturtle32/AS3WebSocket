@@ -7,6 +7,7 @@ package com.worlize.websocket
 	import com.hurlant.crypto.tls.TLSEngine;
 	import com.hurlant.crypto.tls.TLSSecurityParameters;
 	import com.hurlant.crypto.tls.TLSSocket;
+	import com.hurlant.util.Base64;
 	import com.wirelust.as3zlib.Deflate;
 	import com.wirelust.as3zlib.Inflate;
 	import com.wirelust.as3zlib.JZlib;
@@ -24,11 +25,6 @@ package com.worlize.websocket
 	import flash.utils.Endian;
 	import flash.utils.IDataInput;
 	import flash.utils.Timer;
-	
-	import flashx.textLayout.debug.assert;
-	
-	import mx.utils.Base64Encoder;
-	import mx.utils.URLUtil;
 	
 	[Event(name="connectionFail",type="com.worlize.websocket.WebSocketErrorEvent")]
 	[Event(name="message",type="com.worlize.websocket.WebSocketEvent")]
@@ -217,9 +213,7 @@ package com.worlize.websocket
 				nonce.writeByte(Math.round(Math.random()*0xFF));
 			}
 			nonce.position = 0;
-			var encoder:Base64Encoder = new Base64Encoder();
-			encoder.encodeBytes(nonce);
-			base64nonce = encoder.flush();
+			base64nonce = Base64.encodeByteArray(nonce);
 		}
 		
 		public function get readyState():int {
