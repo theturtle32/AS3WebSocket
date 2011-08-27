@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="utf-8"?>
+<s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
+					   xmlns:s="library://ns.adobe.com/flex/spark" 
+					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   creationComplete="handleCreationComplete()">
+	<fx:Declarations>
+		<!-- Place non-visual elements (e.g., services, value objects) here -->
+	</fx:Declarations>
+	
+	<fx:Script>
+		<![CDATA[
+			import com.worlize.websocket.WebSocket;
+			import com.worlize.websocket.WebSocketEvent;
+			import com.worlize.websocket.WebSocketMessage;
+			private var currentCase:int = 1;
+			private var caseCount:int = 0;
+			
+			
+			private function log(data:String):void {
+				trace(data);
+				statusDisplay.text = data;
+			}
+			
+			private function handleCreationComplete():void {
+				log("Starting test run");
+				getCaseCount(startTesting);
+			}
+			
+			private function startTesting():void {
+				currentCase = 1;
+				runNextTestCase();
+			}
+			
+			private function runNextTestCase():void {
+				runTestCase(currentCase++, function():void {
+					if (currentCase <= caseCount) {
+						runNextTestCase();
+					}
+					else {
+						log("Test suite complete, generating report.");
+						updateReport(function():void {
+							log("Report generated.");
+						});
+					}
+				});
+			}
+			
+			private function runTestCase(caseIndex:int, callback:Function):void {
+				log("Running test " + caseIndex + " of " + caseCount);
+				var client:WebSocket = new WebSocket("ws://localhost:9000/runCase?case=" + caseIndex + "&agent=AS3WebSocket", "*");
+				client.config.maxMessageSize = 16 * 1024 * 1024;
+				client.config.maxReceivedFrameSize = 16 * 1024 * 1024;
+				client.config.fragmentOutgoingMessages = false;
+				client.addEventListener(WebSocketEvent.CLOSED, function(event:WebSocketEvent):void {
+					callback();
+				});
+				client.addEventListener(WebSocketEvent.MESSAGE, function(event:WebSocketEvent):void {
+					if (event.message.type === WebSocketMessage.TYPE_BINARY) {
+						client.sendBytes(event.message.binaryData);
+					}
+					else if (event.message.type === WebSocketMessage.TYPE_UTF8) {
+						client.sendUTF(event.message.utf8Data);
+					}
+				});
+				client.connect();
+			}
+			
+			private function getCaseCount(callback:Function):void {
+				log("Getting case count");
+				var client:WebSocket = new WebSocket("ws://localhost:9000/getCaseCount", '*');
+				client.addEventListener(WebSocketEvent.MESSAGE, function(event:WebSocketEvent):void {
+					if (event.message.type === WebSocketMessage.TYPE_UTF8) {
+						caseCount = parseInt(event.message.utf8Data, 10);
+					}
+				});
+				client.addEventListener(WebSocketEvent.CLOSED, function(event:WebSocketEvent):void {
+					callback();
+				});
+				client.connect();
+			}
+			
+			private function updateReport(callback:Function):void {
+				var client:WebSocket = new WebSocket("ws://localhost:9000/updateReports?agent=AS3WebSocket", '*');
+				client.addEventListener(WebSocketEvent.CLOSED, callback);
+				client.connect();
+			}
+		]]>
+	</fx:Script>
+	
+	<s:Label id="statusDisplay" text="Initializing..." />
+</s:WindowedApplication>
