@@ -55,6 +55,12 @@ package com.worlize.websocket
 						return true;
 					}
 					
+					if (opcode > 0x07 && _length > 125) {
+						protocolError = true;
+						dropReason = "Illegal control frame larger than 125 bytes.";
+						return true;
+					}
+					
 					if (_length === 126) {
 						parseState = WAITING_FOR_16_BIT_LENGTH;
 					}
