@@ -422,6 +422,12 @@ package com.worlize.websocket
 			var event:WebSocketEvent;
 			var i:int;
 			var currentFrame:WebSocketFrame;
+			
+			if (frame.rsv1 || frame.rsv2 || frame.rsv3) {
+				drop(WebSocketCloseStatus.PROTOCOL_ERROR,
+					 "Received frame with reserved bit set without a negotiated extension.");
+				return;
+			}
 
 			switch (frame.opcode) {
 				case WebSocketOpcode.BINARY_FRAME:
