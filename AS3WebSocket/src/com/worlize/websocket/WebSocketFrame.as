@@ -55,10 +55,17 @@ package com.worlize.websocket
 						return true;
 					}
 					
-					if (opcode > 0x07 && _length > 125) {
-						protocolError = true;
-						dropReason = "Illegal control frame larger than 125 bytes.";
-						return true;
+					if (opcode > 0x07) {
+						if (_length > 125) {
+							protocolError = true;
+							dropReason = "Illegal control frame larger than 125 bytes.";
+							return true;
+						}
+						if (!fin) {
+							protocolError = true;
+							dropReason = "Received illegal fragmented control message.";
+							return true;
+						}
 					}
 					
 					if (_length === 126) {
