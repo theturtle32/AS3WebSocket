@@ -432,17 +432,19 @@ package com.worlize.websocket
 			switch (frame.opcode) {
 				case WebSocketOpcode.BINARY_FRAME:
 					if (config.assembleFragments) {
-						if (frame.fin) {
-							event = new WebSocketEvent(WebSocketEvent.MESSAGE);
-							event.message = new WebSocketMessage();
-							event.message.type = WebSocketMessage.TYPE_BINARY;
-							event.message.binaryData = frame.binaryPayload;
-							dispatchEvent(event);
-						}
-						else if (frameQueue.length === 0) {
-							// beginning of a fragmented message
-							frameQueue.push(frame);
-							fragmentationOpcode = frame.opcode;
+						if (frameQueue.length === 0) {
+							if (frame.fin) {
+								event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+								event.message = new WebSocketMessage();
+								event.message.type = WebSocketMessage.TYPE_BINARY;
+								event.message.binaryData = frame.binaryPayload;
+								dispatchEvent(event);
+							}
+							else if (frameQueue.length === 0) {
+								// beginning of a fragmented message
+								frameQueue.push(frame);
+								fragmentationOpcode = frame.opcode;
+							}
 						}
 						else {
 							drop(WebSocketCloseStatus.PROTOCOL_ERROR,
@@ -453,17 +455,19 @@ package com.worlize.websocket
 					break;
 				case WebSocketOpcode.TEXT_FRAME:
 					if (config.assembleFragments) {
-						if (frame.fin) {
-							event = new WebSocketEvent(WebSocketEvent.MESSAGE);
-							event.message = new WebSocketMessage();
-							event.message.type = WebSocketMessage.TYPE_UTF8;
-							event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.length, 'utf-8');
-							dispatchEvent(event);
-						}
-						else if (frameQueue.length === 0) {
-							// beginning of a fragmented message
-							frameQueue.push(frame);
-							fragmentationOpcode = frame.opcode;
+						if (frameQueue.length === 0) {
+							if (frame.fin) {
+								event = new WebSocketEvent(WebSocketEvent.MESSAGE);
+								event.message = new WebSocketMessage();
+								event.message.type = WebSocketMessage.TYPE_UTF8;
+								event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.length, 'utf-8');
+								dispatchEvent(event);
+							}
+							else {
+								// beginning of a fragmented message
+								frameQueue.push(frame);
+								fragmentationOpcode = frame.opcode;
+							}
 						}
 						else {
 							drop(WebSocketCloseStatus.PROTOCOL_ERROR,
