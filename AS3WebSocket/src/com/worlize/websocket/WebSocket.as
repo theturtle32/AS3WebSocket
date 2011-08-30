@@ -23,6 +23,8 @@ package com.worlize.websocket
 	import flash.utils.Timer;
 	
 	[Event(name="connectionFail",type="com.worlize.websocket.WebSocketErrorEvent")]
+	[Event(name="ioError",type="com.worlize.websocket.WebSocketErrorEvent")]
+	[Event(name="abnormalClose",type="com.worlize.websocket.WebSocketErrorEvent")]
 	[Event(name="message",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="frame",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="open",type="com.worlize.websocket.WebSocketEvent")]
@@ -583,7 +585,9 @@ package com.worlize.websocket
 			if (debug) {
 				logger("IO Error: " + event);
 			}
-			dispatchEvent(event.clone());
+			var myEvent:WebSocketErrorEvent = new WebSocketErrorEvent(WebSocketErrorEvent.IO_ERROR);
+			myEvent.text = event.text;
+			dispatchEvent(myEvent);
 			dispatchClosedEvent();
 		}
 		
@@ -667,6 +671,11 @@ package com.worlize.websocket
 			
 			frameQueue = new Vector.<WebSocketFrame>();
 			fragmentationSize = 0;
+			if (closeReason !== WebSocketCloseStatus.NORMAL) {
+				var errorEvent:WebSocketErrorEvent = new WebSocketErrorEvent(WebSocketErrorEvent.ABNORMAL_CLOSE);
+				errorEvent.text = "Close reason: " + closeReason;
+				dispatchEvent(errorEvent);
+			}
 			sendCloseFrame(closeReason, reasonText, true);
 			dispatchClosedEvent();
 			socket.close();				
