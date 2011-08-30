@@ -508,9 +508,11 @@ package com.worlize.websocket
 								totalLength += frameQueue[i].length;
 							}
 							if (totalLength > config.maxMessageSize) {
-								throw new WebSocketError("Message size of " + totalLength +
+								drop(WebSocketCloseStatus.MESSAGE_TOO_LARGE,
+									"Message size of " + totalLength +
 									" bytes exceeds maximum accepted message size of " +
 									config.maxMessageSize + " bytes.");
+								return;
 							}
 							for (i=0; i < frameQueue.length; i++) {
 								currentFrame = frameQueue[i];
@@ -532,7 +534,9 @@ package com.worlize.websocket
 									event.message.utf8Data = binaryData.readMultiByte(binaryData.length, 'utf-8');
 									break;
 								default:
-									throw new WebSocketError("Unexpected first opcode in fragmentation sequence: 0x" + messageOpcode.toString(16));
+									drop(WebSocketCloseStatus.PROTOCOL_ERROR,
+										 "Unexpected first opcode in fragmentation sequence: 0x" + messageOpcode.toString(16));
+									return;
 							}
 							frameQueue = new Vector.<WebSocketFrame>();
 							fragmentationOpcode = 0x00;
