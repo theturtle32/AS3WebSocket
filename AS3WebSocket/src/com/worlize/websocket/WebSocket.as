@@ -124,11 +124,12 @@ package com.worlize.websocket
 				socket = tlsSocket = new TLSSocket();
 			}
 			
+			
 			rawSocket.addEventListener(Event.CONNECT, handleSocketConnect);
-			rawSocket.addEventListener(Event.CLOSE, handleSocketClose);
 			rawSocket.addEventListener(IOErrorEvent.IO_ERROR, handleSocketIOError);
 			rawSocket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSocketSecurityError);
 			
+			socket.addEventListener(Event.CLOSE, handleSocketClose);			
 			socket.addEventListener(ProgressEvent.SOCKET_DATA, handleSocketData);
 			
 			_readyState = WebSocketState.INIT;
