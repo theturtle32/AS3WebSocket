@@ -68,7 +68,7 @@ package com.worlize.websocket
 		
 		private var handshakeBytesReceived:int;
 		private var handshakeTimer:Timer;
-		private var handshakeTimeout:int = 5000;
+		private var handshakeTimeout:int = 10000;
 		
 		private var tlsConfig:TLSConfig;
 		private var tlsSocket:TLSSocket;
@@ -813,7 +813,7 @@ package com.worlize.websocket
 		}
 		
 		private function handleHandshakeTimer(event:TimerEvent):void {
-			failHandshake();
+			failHandshake("Timed out waiting for server response.");
 		}
 		
 		private function parseHTTPHeader(line:String):Object {
