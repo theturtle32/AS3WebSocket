@@ -561,16 +561,23 @@ package com.worlize.websocket
 					break;
 				case WebSocketOpcode.CONNECTION_CLOSE:
 					if (debug) {
-						logger("Received close from server");
+						logger("Received close frame");
 					}
 					if (waitingForServerClose) {
 						// got confirmation from server, finish closing connection
+						if (debug) {
+							logger("Got close confirmation from server.");
+						}
 						closeTimer.stop();
 						waitingForServerClose = false;
 						socket.close();
 					}
 					else {
+						if (debug) {
+							logger("Sending close response to server.");
+						}
 						close(false);
+						socket.close();
 					}
 					break;
 				default:
