@@ -78,7 +78,7 @@ package com.worlize.websocket
 		
 		public var config:WebSocketConfig = new WebSocketConfig();
 		
-		public static var debug:Boolean = false;
+		public var debug:Boolean = false;
 		
 		public static var logger:Function = function(text:String):void {
 			trace(text);
