@@ -103,6 +103,8 @@ package com.worlize.websocket
 			frameQueue = new Vector.<WebSocketFrame>();
 			fragmentationOpcode = 0x00;
 			fragmentationSize = 0;
+			
+			currentFrame = new WebSocketFrame();
 
 			fatalError = false;
 			
@@ -342,6 +344,13 @@ package com.worlize.websocket
 		}
 		
 		public function close(waitForServer:Boolean = true):void {
+			if (!socket.connected && _readyState === WebSocketState.CONNECTING) {
+				_readyState = WebSocketState.CLOSED;
+				try {
+					socket.close();
+				}
+				catch(e:Error) { /* do nothing */ }
+			}
 			if (socket.connected) {
 				var frame:WebSocketFrame = new WebSocketFrame();
 				frame.rsv1 = frame.rsv2 = frame.rsv3 = frame.mask = false;

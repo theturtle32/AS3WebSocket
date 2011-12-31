@@ -1,16 +1,10 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <actionScriptProperties analytics="false" mainApplicationPath="AS3WebSocket.as" projectUUID="3361d4ca-c8ef-4bec-b584-63a15885a235" version="10">
-  <compiler additionalCompilerArguments="-locale en_US -link-report=link_report.xml" autoRSLOrdering="true" copyDependentFiles="false" fteInMXComponents="false" generateAccessible="false" htmlExpressInstall="true" htmlGenerate="false" htmlHistoryManagement="false" htmlPlayerVersionCheck="true" includeNetmonSwc="false" outputFolderPath="bin" removeUnusedRSL="true" sourceFolderPath="src" strict="true" targetPlayerVersion="10.2.0" useApolloConfig="false" useDebugRSLSwfs="true" verifyDigests="true" warn="true">
+  <compiler additionalCompilerArguments="-locale en_US -link-report=link_report.xml" autoRSLOrdering="true" copyDependentFiles="false" fteInMXComponents="false" generateAccessible="false" htmlExpressInstall="true" htmlGenerate="false" htmlHistoryManagement="false" htmlPlayerVersionCheck="true" includeNetmonSwc="false" outputFolderPath="bin" removeUnusedRSL="true" sourceFolderPath="src" strict="true" targetPlayerVersion="0.0.0" useApolloConfig="false" useDebugRSLSwfs="true" verifyDigests="true" warn="true">
     <compilerSourcePath/>
     <libraryPath defaultLinkType="0">
       <libraryPathEntry kind="1" linkType="1" path="lib"/>
       <libraryPathEntry kind="4" path="">
-        <modifiedEntries>
-          <libraryPathEntry kind="3" linkType="2" path="${PROJECT_FRAMEWORKS}/libs/authoringsupport.swc" useDefaultLinkType="true"/>
-          <libraryPathEntry kind="3" linkType="2" path="${PROJECT_FRAMEWORKS}/libs/core.swc" useDefaultLinkType="true"/>
-          <libraryPathEntry kind="3" linkType="2" path="${PROJECT_FRAMEWORKS}/libs/flash-integration.swc" useDefaultLinkType="true"/>
-          <libraryPathEntry index="1" kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/framework.swc" useDefaultLinkType="true"/>
-        </modifiedEntries>
         <excludedEntries>
           <libraryPathEntry kind="3" linkType="1" path="${PROJECT_FRAMEWORKS}/libs/flex.swc" useDefaultLinkType="false"/>
         </excludedEntries>
@@ -25,3 +19,4 @@
   <buildCSSFiles/>
   <flashCatalyst validateFlashCatalystCompatibility="false"/>
 </actionScriptProperties>
+
