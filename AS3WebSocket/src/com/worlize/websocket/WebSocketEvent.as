@@ -10,9 +10,6 @@ package com.worlize.websocket
 		public static const MESSAGE:String = "message";
 		public static const FRAME:String = "frame";
 		
-		public static const TYPE_BINARY:int = 0;
-		public static const TYPE_UTF8:int = 1;
-		
 		public var message:WebSocketMessage;
 		public var frame:WebSocketFrame;
 		
