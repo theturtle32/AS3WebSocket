@@ -3,6 +3,7 @@ package com.worlize.websocket
 	import com.adobe.crypto.SHA1;
 	import com.adobe.net.URI;
 	import com.adobe.net.URIEncodingBitmap;
+	import com.adobe.utils.StringUtil;
 	import com.hurlant.crypto.tls.TLSConfig;
 	import com.hurlant.crypto.tls.TLSEngine;
 	import com.hurlant.crypto.tls.TLSSecurityParameters;
@@ -40,12 +41,14 @@ package com.worlize.websocket
 		
 		private var _readyState:int;
 		private var _uri:URI;
-		private var _protocol:String;
+		private var _protocols:Array;
+		private var _serverProtocol:String;
 		private var _host:String;
 		private var _port:uint;
 		private var _resource:String;
 		private var _secure:Boolean;
 		private var _origin:String;
+		private var _pseudoMasking:Boolean = false;
 		
 		private var rawSocket:Socket;
 		private var socket:Socket;
@@ -84,11 +87,22 @@ package com.worlize.websocket
 			trace(text);
 		};
 		
-		public function WebSocket(uri:String, origin:String, protocol:String = null, timeout:uint = 10000)
+		public function WebSocket(uri:String, origin:String, protocols:* = null, timeout:uint = 10000)
 		{
 			super(null);
 			_uri = new URI(uri);
-			_protocol = protocol;
+			
+			if (protocols is String) {
+				_protocols = [protocols];
+			}
+			else {
+				_protocols = protocols;
+			}
+			if (_protocols) {
+				for (var i:int=0; i<_protocols.length; i++) {
+					_protocols[i] = StringUtil.trim(_protocols[i]);
+				}
+			}
 			_origin = origin;
 			this.timeout = timeout;
 			this.handshakeTimeout = timeout;
@@ -138,18 +152,22 @@ package com.worlize.websocket
 		}
 		
 		private function validateProtocol():void {
-			if (_protocol) {
+			if (_protocols) {
 				var separators:Array = [
 					"(", ")", "<", ">", "@",
 					",", ";", ":", "\\", "\"",
 					"/", "[", "]", "?", "=",
 					"{", "}", " ", String.fromCharCode(9)
 				];
-				for (var i:int = 0; i < _protocol.length; i++) {
-					var charCode:int = _protocol.charCodeAt(i);
-					var char:String = _protocol.charAt(i);
-					if (charCode < 0x21 || charCode > 0x7E || separators.indexOf(char) !== -1) {
-						throw new WebSocketError("Illegal character '" + String.fromCharCode(char) + "' in subprotocol.");
+				
+				for (var p:int = 0; p < _protocols.length; p++) {
+					var protocol:String = _protocols[p];
+					for (var i:int = 0; i < protocol.length; i++) {
+						var charCode:int = protocol.charCodeAt(i);
+						var char:String = protocol.charAt(i);
+						if (charCode < 0x21 || charCode > 0x7E || separators.indexOf(char) !== -1) {
+							throw new WebSocketError("Illegal character '" + String.fromCharCode(char) + "' in subprotocol.");
+						}
 					}
 				}
 			}
@@ -227,8 +245,12 @@ package com.worlize.websocket
 			return uri;
 		}
 		
-		public function get protocol():String {
-			return _protocol;
+		public function get protocols():Array {
+			return _protocols;
+		}
+		
+		public function get serverProtocol():String {
+			return _serverProtocol;
 		}
 		
 		public function get host():String {
@@ -249,6 +271,18 @@ package com.worlize.websocket
 		
 		public function get connected():Boolean {
 			return readyState === WebSocketState.OPEN;
+		}
+		
+		// Pseudo masking is useful for speeding up wbesocket usage in a controlled environment,
+		// such as a self-contained AIR app for mobile where the client can be resonably sure of
+		// not intending to screw up proxies by confusing them with HTTP commands in the frame body
+		// Probably not a good idea to enable if being used on the web in general cases.
+		public function set pseudoMasking(val:Boolean):void {
+			_pseudoMasking = val;
+		}
+		
+		public function get pseudoMasking():Boolean {
+			return _pseudoMasking;
 		}
 		
 		private function verifyConnectionForSend():void {
@@ -330,6 +364,7 @@ package com.worlize.websocket
 		
 		private function sendFrame(frame:WebSocketFrame, force:Boolean = false):void {
 			frame.mask = true;
+			frame.pseudoMask = _pseudoMasking;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
 			sendData(buffer);
@@ -625,10 +660,13 @@ package com.worlize.websocket
 			text += "Upgrade: websocket\r\n";
 			text += "Connection: Upgrade\r\n";
 			text += "Sec-WebSocket-Key: " + base64nonce + "\r\n";
-			text += "Sec-Websocket-Origin: " + _origin + "\r\n";
-			text += "Sec-WebSocket-Version: 8\r\n";
-			if (protocol) {
-				text += "Sec-WebSocket-Protocol: " + protocol + "\r\n";
+			if (_origin) {
+				text += "Origin: " + _origin + "\r\n";
+			}
+			text += "Sec-WebSocket-Version: 13\r\n";
+			if (_protocols) {
+				var protosList:String = _protocols.join(", ");
+				text += "Sec-WebSocket-Protocol: " + protosList + "\r\n";
 			}
 			// TODO: Handle Extensions
 			text += "\r\n";
@@ -786,6 +824,15 @@ package com.worlize.websocket
 							keyValidated = true;
 						}
 					}
+					else if(lcName === 'sec-websocket-protocol') {
+						if (_protocols) {
+							for each (var protocol:String in _protocols) {
+								if (protocol == header.value) {
+									_serverProtocol = protocol;
+								}
+							}
+						}
+					}
 				}
 			}
 			catch(e:Error) {
@@ -806,6 +853,11 @@ package com.worlize.websocket
 				return;
 			}
 
+			if (_protocols && !_serverProtocol) {
+				failHandshake("The server can not respond in any of our requested protocols");
+				return;
+			}
+			
 			if (debug) {
 				logger("Server Extensions: " + serverExtensions.join(' | '));
 			}

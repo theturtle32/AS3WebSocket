@@ -15,6 +15,7 @@ package com.worlize.websocket
 		public var rsv3:Boolean;
 		public var opcode:int;
 		public var mask:Boolean;
+		public var pseudoMask:Boolean;
 		private var _length:int;
 		public var binaryPayload:ByteArray;
 		public var closeStatus:int;
@@ -29,6 +30,8 @@ package com.worlize.websocket
 		private static const WAITING_FOR_PAYLOAD:int = 3;
 		private static const COMPLETE:int = 4;
 		private var parseState:int = 0; // Initialize as NEW_FRAME
+		
+		private static var _tempMaskBytes:Vector.<uint> = new Vector.<uint>(4);
 		
 		public function get length():int {
 			return _length;
@@ -139,17 +142,15 @@ package com.worlize.websocket
 		}
 		
 		public function send(output:IDataOutput):void {
-			var frameHeader:ByteArray = new ByteArray();
-			frameHeader.endian = Endian.BIG_ENDIAN;
 			
-			if (this.mask) {
+			var maskKey:uint;
+			if (this.mask && !this.pseudoMask) {
 				// Generate a mask key
-				var maskKey:uint = Math.ceil(Math.random()*0xFFFFFFFF);
-				var maskBytes:Vector.<uint> = new Vector.<uint>(4);
-				maskBytes[0] = (maskKey >> 24) & 0xFF;
-				maskBytes[1] = (maskKey >> 16) & 0xFF;
-				maskBytes[2] = (maskKey >> 8)  & 0xFF;
-				maskBytes[3] =  maskKey        & 0xFF;
+				maskKey = Math.ceil(Math.random()*0xFFFFFFFF);
+				_tempMaskBytes[0] = (maskKey >> 24) & 0xFF;
+				_tempMaskBytes[1] = (maskKey >> 16) & 0xFF;
+				_tempMaskBytes[2] = (maskKey >> 8)  & 0xFF;
+				_tempMaskBytes[3] =  maskKey        & 0xFF;
 			}
 			
 			var data:ByteArray;
@@ -222,14 +223,28 @@ package com.worlize.websocket
 			}
 			
 			if (this.mask) {
-				// write the mask key to the output	
-				output.writeUnsignedInt(maskKey);
-				// Mask and send the payload
-				var i:uint,
-				j:int = 0;
-				for (i = 0; i < _length; i ++) {
-					output.writeByte(data.readByte() ^ maskBytes[j]);
-					j = (j + 1) & 3;
+				
+				if (this.pseudoMask) {
+					output.writeUnsignedInt(0);
+					output.writeBytes(data, 0, data.length);
+				}
+				else {
+					// write the mask key to the output	
+					output.writeUnsignedInt(maskKey);
+					// Mask and send the payload
+					
+					var j:int = 0;
+					
+					var remaining:uint = data.bytesAvailable;
+					while (remaining >= 4) {
+						output.writeUnsignedInt(data.readUnsignedInt() ^ maskKey);
+						remaining -= 4;
+					}
+					while (remaining > 0) {
+						output.writeByte(data.readByte() ^ _tempMaskBytes[j]);
+						j += 1;
+						remaining -= 1;
+					}
 				}
 			}
 			else {
