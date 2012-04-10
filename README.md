@@ -1,11 +1,11 @@
 ActionScript 3 WebSocket Client
 ===============================
 
-*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the -10 draft.*
+*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the rfc6455 standard.*
 
 Explanation
 -----------
-THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent -10 draft.  Once the next draft is released I will update this client to work only with that version, and so on, until the final version of the protocol is ratified by the IETF.  I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
+THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent rfc6455 standard. I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
 
 I intend to keep this library updated to the latest draft of the IETF WebSocket protocol when new versions are released.  I built this library because I wanted to be able to make use of the latest draft of the protocol, but no browser implements it yet.
 
@@ -24,7 +24,7 @@ Download
 
 Features
 --------
-- Based on -10 draft of the WebSocket protocol
+- Based on the rfc6455 standard WebSocket protocol
 - wss:// TLS support w/ hurlant as3crypto library
   - Learn more here: [as3crypto on Google Code](http://code.google.com/p/as3crypto/)
 - Can send and receive fragmented messages

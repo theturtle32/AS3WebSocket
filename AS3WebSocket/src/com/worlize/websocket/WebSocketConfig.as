@@ -30,5 +30,6 @@ package com.worlize.websocket
 		// for an acknowledgement to come back before giving up and just
 		// closing the socket.
 		public var closeTimeout:uint = 5000;
+		
 	}
 }
