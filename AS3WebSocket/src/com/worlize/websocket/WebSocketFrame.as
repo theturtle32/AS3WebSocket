@@ -15,7 +15,7 @@ package com.worlize.websocket
 		public var rsv3:Boolean;
 		public var opcode:int;
 		public var mask:Boolean;
-		public var pseudoMask:Boolean;
+		public var useNullMask:Boolean;
 		private var _length:int;
 		public var binaryPayload:ByteArray;
 		public var closeStatus:int;
@@ -144,7 +144,7 @@ package com.worlize.websocket
 		public function send(output:IDataOutput):void {
 			
 			var maskKey:uint;
-			if (this.mask && !this.pseudoMask) {
+			if (this.mask && !this.useNullMask) {
 				// Generate a mask key
 				maskKey = Math.ceil(Math.random()*0xFFFFFFFF);
 				_tempMaskBytes[0] = (maskKey >> 24) & 0xFF;
@@ -224,7 +224,7 @@ package com.worlize.websocket
 			
 			if (this.mask) {
 				
-				if (this.pseudoMask) {
+				if (this.useNullMask) {
 					output.writeUnsignedInt(0);
 					output.writeBytes(data, 0, data.length);
 				}

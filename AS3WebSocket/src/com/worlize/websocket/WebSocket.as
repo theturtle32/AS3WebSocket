@@ -48,7 +48,7 @@ package com.worlize.websocket
 		private var _resource:String;
 		private var _secure:Boolean;
 		private var _origin:String;
-		private var _pseudoMasking:Boolean = false;
+		private var _useNullMask:Boolean = false;
 		
 		private var rawSocket:Socket;
 		private var socket:Socket;
@@ -277,12 +277,12 @@ package com.worlize.websocket
 		// such as a self-contained AIR app for mobile where the client can be resonably sure of
 		// not intending to screw up proxies by confusing them with HTTP commands in the frame body
 		// Probably not a good idea to enable if being used on the web in general cases.
-		public function set pseudoMasking(val:Boolean):void {
-			_pseudoMasking = val;
+		public function set useNullMask(val:Boolean):void {
+			_useNullMask = val;
 		}
 		
-		public function get pseudoMasking():Boolean {
-			return _pseudoMasking;
+		public function get useNullMask():Boolean {
+			return _useNullMask;
 		}
 		
 		private function verifyConnectionForSend():void {
@@ -364,7 +364,7 @@ package com.worlize.websocket
 		
 		private function sendFrame(frame:WebSocketFrame, force:Boolean = false):void {
 			frame.mask = true;
-			frame.pseudoMask = _pseudoMasking;
+			frame.useNullMask = _useNullMask;
 			var buffer:ByteArray = new ByteArray();
 			frame.send(buffer);
 			sendData(buffer);
