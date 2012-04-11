@@ -24,7 +24,7 @@ package com.worlize.websocket
 	import flash.utils.Timer;
 	
 	[Event(name="connectionFail",type="com.worlize.websocket.WebSocketErrorEvent")]
-	[Event(name="ioError",type="com.worlize.websocket.WebSocketErrorEvent")]
+	[Event(name="ioError",type="flash.events.IOErrorEvent")]
 	[Event(name="abnormalClose",type="com.worlize.websocket.WebSocketErrorEvent")]
 	[Event(name="message",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="frame",type="com.worlize.websocket.WebSocketEvent")]
@@ -637,9 +637,7 @@ package com.worlize.websocket
 			if (debug) {
 				logger("IO Error: " + event);
 			}
-			var myEvent:WebSocketErrorEvent = new WebSocketErrorEvent(WebSocketErrorEvent.IO_ERROR);
-			myEvent.text = event.text;
-			dispatchEvent(myEvent);
+			dispatchEvent(event);
 			dispatchClosedEvent();
 		}
 		
