@@ -253,6 +253,10 @@ package com.worlize.websocket
 			return _serverProtocol;
 		}
 		
+		public function get extensions():Array {
+			return [];
+		}
+		
 		public function get host():String {
 			return _host;
 		}
