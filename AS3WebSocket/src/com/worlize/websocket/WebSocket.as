@@ -245,10 +245,6 @@ package com.worlize.websocket
 			return uri;
 		}
 		
-		public function get protocols():Array {
-			return _protocols;
-		}
-		
 		public function get protocol():String {
 			return _serverProtocol;
 		}
