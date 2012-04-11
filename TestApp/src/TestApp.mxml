@@ -2,6 +2,7 @@
 <s:WindowedApplication xmlns:fx="http://ns.adobe.com/mxml/2009" 
 					   xmlns:s="library://ns.adobe.com/flex/spark" 
 					   xmlns:mx="library://ns.adobe.com/flex/mx"
+					   creationComplete="handleCreationComplete()"
 					   width="800" height="500">
 	<fx:Declarations>
 		<!-- Place non-visual elements (e.g., services, value objects) here -->
@@ -43,7 +44,6 @@
 				websocket = new WebSocket("ws://localhost", "*");
 				loadSettings();
 				var scrollToBottomTimer:Number = NaN;
-				WebSocket.debug = true;
 				WebSocket.logger = function(text:String):void {
 					trace(text);
 					log += (text + "\n");
@@ -84,6 +84,7 @@
 				connectButton.enabled = false;
 				var subprotocol:String = protocolSelector.selectedIndex < 0 ? protocolSelector.textInput.text : protocolSelector.selectedItem['value'];
 				websocket = new WebSocket(urlField.text, "*", subprotocol, 5000);
+				websocket.debug = true;
 				websocket.connect();
 				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
 				websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
@@ -172,7 +173,7 @@
 			private var startMouseY:Number;
 			
 			private function handleMouseDown(event:MouseEvent):void {
-				if (websocket.connected && websocket.protocol === 'lws-mirror-protocol') {
+				if (websocket && websocket.connected && websocket.protocol === 'lws-mirror-protocol') {
 					drawing = true;
 					startMouseX = drawCanvas.mouseX;
 					startMouseY = drawCanvas.mouseY;
