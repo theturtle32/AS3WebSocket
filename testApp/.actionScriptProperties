@@ -27,11 +27,11 @@
   <flashCatalyst validateFlashCatalystCompatibility="false"/>
   <buildTargets>
     <buildTarget buildTargetName="default">
-      <airSettings airCertificatePath="" airTimestamp="true" version="1">
+      <airSettings airCertificatePath="/Users/theturtle32/work/worlize/AIR Certificate/personal-cert.p12" airTimestamp="true" anePathSet="true" version="1">
         <airExcludes/>
+        <anePaths/>
       </airSettings>
       <actionScriptSettings version="1"/>
     </buildTarget>
   </buildTargets>
 </actionScriptProperties>
-
