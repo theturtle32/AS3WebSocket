@@ -249,7 +249,7 @@ package com.worlize.websocket
 			return _protocols;
 		}
 		
-		public function get serverProtocol():String {
+		public function get protocol():String {
 			return _serverProtocol;
 		}
 		
