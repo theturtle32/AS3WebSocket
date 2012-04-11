@@ -1,20 +1,20 @@
 ActionScript 3 WebSocket Client
 ===============================
 
-*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the rfc6455 standard.*
+*This is an AS3 implementation of a client library of the WebSocket protocol, as specified in the RFC6455 standard.*
 
 Explanation
 -----------
-THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent rfc6455 standard. I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
+THIS CLIENT WILL NOT WORK with draft-75 or draft-76/-00 servers that are deployed on the internet.  It is only for the most recent RFC6455 standard. I will keep a version tracking each of the IETF drafts in its own branch, with master tracking the latest.
 
 I intend to keep this library updated to the latest draft of the IETF WebSocket protocol when new versions are released.  I built this library because I wanted to be able to make use of the latest draft of the protocol, but no browser implements it yet.
 
-See the [WebSocket Protocol draft specification](http://www.ietf.org/id/draft-ietf-hybi-thewebsocketprotocol-10.txt).
+See the [WebSocket Protocol Specification](http://tools.ietf.org/html/rfc6455) (RFC6455).
 
 
-The AS3WebSocket directory contains a Flash Builder 4 Library Project that contains the WebSocket client library.
+The AS3WebSocket directory contains a Flash Builder 4.6 Library Project that contains the WebSocket client library.
 
-The testApp directory contains a Flash Builder 4 Air Project that uses the AS3WebSocket library and implements two of the test subprotocols from Andy Green's libwebsockets test server, the dumb-increment-protocol, and the lws-mirror-protocol.  [Click here](http://git.warmcat.com/cgi-bin/cgit/libwebsockets) for more detail about the libwebsockets test server.
+The testApp directory contains a Flash Builder 4.6 Air Project that uses the AS3WebSocket library and implements two of the test subprotocols from Andy Green's libwebsockets test server, the dumb-increment-protocol, and the lws-mirror-protocol.  [Click here](http://git.warmcat.com/cgi-bin/cgit/libwebsockets) for more detail about the libwebsockets test server.
 
 
 Download
@@ -24,7 +24,7 @@ Download
 
 Features
 --------
-- Based on the rfc6455 standard WebSocket protocol
+- Based on the RFC6455 standard WebSocket protocol
 - wss:// TLS support w/ hurlant as3crypto library
   - Learn more here: [as3crypto on Google Code](http://code.google.com/p/as3crypto/)
 - Can send and receive fragmented messages
