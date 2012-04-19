@@ -54,7 +54,7 @@ package com.hurlant.util.der
 		}
 		
 		public function toDER():ByteArray {
-			return null // XXX not implemented
+			return null; // XXX not implemented
 		}
 	}
 }

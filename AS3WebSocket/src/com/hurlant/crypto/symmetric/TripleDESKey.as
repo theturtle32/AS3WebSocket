@@ -58,7 +58,7 @@ package com.hurlant.crypto.symmetric
 			}
 			if (decKey2!=null) {
 				for (i=0;i<decKey2.length;i++) { decKey2[i]=0; }
-				decKey2=null
+				decKey2=null;
 			}
 			if (decKey3!=null) {
 				for (i=0;i<decKey3.length;i++) { decKey3[i]=0; }

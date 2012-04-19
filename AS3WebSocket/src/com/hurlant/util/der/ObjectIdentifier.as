@@ -37,7 +37,7 @@ package com.hurlant.util.der
 			// parse stuff
 			// first byte = 40*value1 + value2
 			var o:uint = b.readUnsignedByte();
-			var a:Array = []
+			var a:Array = [];
 			a.push(uint(o/40));
 			a.push(uint(o%40));
 			var v:uint = 0;

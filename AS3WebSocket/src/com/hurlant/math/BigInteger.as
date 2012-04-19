@@ -87,7 +87,7 @@ package com.hurlant.math
 			var r:String = "";
 			var i:int = t;
 			var p:int = DB-(i*DB)%k;
-			if (i-->0) {
+			if (i-- > 0) {
 				if (p<DB && (d=a[i]>>p)>0) {
 					m = true;
 					r = d.toString(36);
@@ -121,7 +121,7 @@ package com.hurlant.math
 			var p:int = DB-(i*DB)%k;
 			var m:Boolean = false;
 			var c:int = 0;
-			if (i-->0) {
+			if (i-- > 0) {
 				if (p<DB && (d=a[i]>>p)>0) {
 					m = true;
 					array.writeByte(d);
@@ -775,7 +775,7 @@ package com.hurlant.math
 			var p:int = DB-(i*DB)%8;
 			var d:int;
 			var k:int=0;
-			if (i-->0) {
+			if (i-- > 0) {
 				if (p<DB && (d=a[i]>>p)!=(s&DM)>>p) {
 					r[k++] = d|(s<<(DB-p));
 				}
@@ -934,7 +934,7 @@ package com.hurlant.math
 		 */
 		private function cbit(x:int):int {
 			var r:uint =0;
-			while (x!=0) { x &= x-1; ++r }
+			while (x!=0) { x &= x-1; ++r; }
 			return r;
 		}
 		
