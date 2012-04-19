@@ -41,7 +41,7 @@ package com.hurlant.crypto.rsa
 		// extended private key
 		public var p:BigInteger;
 		public var q:BigInteger;
-		public var dmp1:BigInteger
+		public var dmp1:BigInteger;
 		public var dmq1:BigInteger;
 		public var coeff:BigInteger;
 		// flags. flags are cool.

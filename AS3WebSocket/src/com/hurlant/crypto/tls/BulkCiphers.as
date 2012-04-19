@@ -20,7 +20,7 @@ package com.hurlant.crypto.tls {
 
 		public static const NULL:uint = 0;
 		public static const RC4_40:uint = 1;
-		public static const RC4_128:uint = 2
+		public static const RC4_128:uint = 2;
 		public static const RC2_CBC_40:uint = 3; // XXX I don't have that one.
 		public static const DES_CBC:uint = 4;
 		public static const DES3_EDE_CBC:uint = 5;

@@ -54,7 +54,7 @@ package com.hurlant.crypto.hash
 			// convert ByteArray to an array of uint
 			src.position=0;
 			var a:Array = [];
-			src.endian=Endian.LITTLE_ENDIAN
+			src.endian=Endian.LITTLE_ENDIAN;
 			for (var i:uint=0;i<src.length;i+=4) {
 				a.push(src.readUnsignedInt());
 			}
