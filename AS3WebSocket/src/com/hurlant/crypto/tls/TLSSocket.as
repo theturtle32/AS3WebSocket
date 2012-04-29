@@ -54,7 +54,7 @@ package com.hurlant.crypto.tls {
 		private var _socket:Socket;
 		private var _config:TLSConfig;
 		private var _engine:TLSEngine;
-		public static const ACCEPT_PEER_CERT_PROMPT:String = "acceptPeerCertificatePrompt"
+		public static const ACCEPT_PEER_CERT_PROMPT:String = "acceptPeerCertificatePrompt";
 		
 		public function TLSSocket(host:String = null, port:int = 0, config:TLSConfig = null) {
 			_config = config;
@@ -241,7 +241,7 @@ package com.hurlant.crypto.tls {
 		}
 		
 		override public function readBytes(bytes:ByteArray, offset:uint = 0, length:uint = 0):void {
-			return _iStream.readBytes(bytes, offset, length);
+			_iStream.readBytes(bytes, offset, length);
 		}
 		
 		override public function readDouble():Number {

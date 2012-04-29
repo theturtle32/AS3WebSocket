@@ -104,8 +104,8 @@ package com.hurlant.crypto.tls {
 			var serverConfig:TLSConfig = new TLSConfig(TLSEngine.SERVER, null, null, null, null, null, SSLSecurityParameters.PROTOCOL_VERSION);
 
 
-			var cert:ByteArray = new myCert;
-			var key:ByteArray = new myKey;
+			var cert:ByteArray = new myCert();
+			var key:ByteArray = new myKey();
 			serverConfig.setPEMCertificate(cert.readUTFBytes(cert.length), key.readUTFBytes(key.length));
 			// tmp, for debugging. currently useless
 			cert.position = 0;

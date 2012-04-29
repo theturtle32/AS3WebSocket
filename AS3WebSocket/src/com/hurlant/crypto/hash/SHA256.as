@@ -78,7 +78,7 @@ package com.hurlant.crypto.hash
 						w[j] = w[j-16] + s0 + w[j-7] + s1;
 					}
 					var t2:uint = (rrol(a,2) ^ rrol(a,13) ^ rrol(a,22)) + ((a&b) ^ (a&c) ^ (b&c));
-					var t1:uint = h + (rrol(e,6) ^ rrol(e,11) ^ rrol(e,25)) + ((e&f)^(g&~e)) + k[j] + w[j]
+					var t1:uint = h + (rrol(e,6) ^ rrol(e,11) ^ rrol(e,25)) + ((e&f)^(g&~e)) + k[j] + w[j];
 					h = g;
 					g = f;
 					f = e;

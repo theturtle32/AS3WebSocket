@@ -48,7 +48,7 @@ package com.hurlant.util.der
 				}
 			}
 			// data
-			var b:ByteArray
+			var b:ByteArray;
 			switch (type) {
 				case 0x00: // WHAT IS THIS THINGY? (seen as 0xa0)
 					// (note to self: read a spec someday.)
@@ -63,7 +63,7 @@ package com.hurlant.util.der
 						arrayStruct = arrayStruct.concat();
 					}
 					while (der.position < p+len) {
-						var tmpStruct:Object = null
+						var tmpStruct:Object = null;
 						if (arrayStruct!=null) {
 							tmpStruct = arrayStruct.shift();
 						}
