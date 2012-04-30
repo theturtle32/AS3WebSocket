@@ -28,6 +28,8 @@ package com.worlize.websocket
 	[Event(name="abnormalClose",type="com.worlize.websocket.WebSocketErrorEvent")]
 	[Event(name="message",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="frame",type="com.worlize.websocket.WebSocketEvent")]
+	[Event(name="ping",type="com.worlize.websocket.WebSocketEvent")]
+	[Event(name="pong",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="open",type="com.worlize.websocket.WebSocketEvent")]
 	[Event(name="closed",type="com.worlize.websocket.WebSocketEvent")]
 	public class WebSocket extends EventDispatcher
@@ -308,11 +310,14 @@ package com.worlize.websocket
 			fragmentAndSend(frame);
 		}
 		
-		public function ping():void {
+		public function ping(payload:ByteArray = null):void {
 			verifyConnectionForSend();
 			var frame:WebSocketFrame = new WebSocketFrame();
 			frame.fin = true;
 			frame.opcode = WebSocketOpcode.PING;
+			if (payload) {
+				frame.binaryPayload = payload;
+			}
 			sendFrame(frame);
 		}
 		
@@ -596,12 +601,19 @@ package com.worlize.websocket
 					if (debug) {
 						logger("Received Ping");
 					}
-					pong(frame.binaryPayload);
+					var pingEvent:WebSocketEvent = new WebSocketEvent(WebSocketEvent.PING, false, true);
+					pingEvent.frame = frame;
+					if (dispatchEvent(pingEvent)) {
+						pong(frame.binaryPayload);
+					}
 					break;
 				case WebSocketOpcode.PONG:
 					if (debug) {
 						logger("Received Pong");
 					}
+					var pongEvent:WebSocketEvent = new WebSocketEvent(WebSocketEvent.PONG);
+					pongEvent.frame = frame;
+					dispatchEvent(pongEvent);
 					break;
 				case WebSocketOpcode.CONNECTION_CLOSE:
 					if (debug) {

@@ -195,6 +195,15 @@ package com.worlize.websocket
 				_length = 0;
 			}
 			
+			if (opcode >= 0x08) {
+				if (_length > 125) {
+					throw new Error("Illegal control frame longer than 125 bytes");
+				}
+				if (!fin) {
+					throw new Error("Control frames must not be fragmented.");
+				}
+			}
+			
 			if (_length <= 125) {
 				// encode the length directly into the two-byte frame header
 				secondByte |= (_length & 0x7F);

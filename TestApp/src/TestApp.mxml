@@ -16,8 +16,11 @@
 			import com.worlize.websocket.WebSocketMessage;
 			
 			import mx.collections.ArrayCollection;
+			import mx.utils.UIDUtil;
 			
 			private var websocket:WebSocket;
+			
+			private var pings:Object = {};
 			
 			[Bindable]
 			private var dumbIncrementValue:int = 0;
@@ -89,6 +92,7 @@
 				websocket.addEventListener(WebSocketEvent.CLOSED, handleWebSocketClosed);
 				websocket.addEventListener(WebSocketEvent.OPEN, handleWebSocketOpen);
 				websocket.addEventListener(WebSocketEvent.MESSAGE, handleWebSocketMessage);
+				websocket.addEventListener(WebSocketEvent.PONG, handlePong);
 				websocket.addEventListener(IOErrorEvent.IO_ERROR, handleIOError);
 				websocket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSecurityError);
 				websocket.addEventListener(WebSocketErrorEvent.CONNECTION_FAIL, handleConnectionFail);
@@ -97,11 +101,13 @@
 			private function handleIOError(event:IOErrorEvent):void {
 				connectButton.enabled = true;
 				disconnectButton.enabled = false;
+				pingButton.enabled = false;
 			}
 			
 			private function handleSecurityError(event:SecurityErrorEvent):void {
 				connectButton.enabled = true;
 				disconnectButton.enabled = false;
+				pingButton.enabled = false;
 			}
 			
 			private function handleConnectionFail(event:WebSocketErrorEvent):void {
@@ -111,6 +117,7 @@
 			private function handleWebSocketClosed(event:WebSocketEvent):void {
 				WebSocket.logger("Websocket closed.");
 				disconnectButton.enabled = false;
+				pingButton.enabled = false;
 				connectButton.enabled = true;
 				if (websocket.protocol === 'lws-mirror-protocol') {
 					drawCanvas.graphics.clear();
@@ -120,6 +127,7 @@
 			private function handleWebSocketOpen(event:WebSocketEvent):void {
 				WebSocket.logger("Websocket Connected");
 				disconnectButton.enabled = true;
+				pingButton.enabled = true;
 			}
 			
 			private function handleWebSocketMessage(event:WebSocketEvent):void {
@@ -208,6 +216,29 @@
 				websocket.close();
 			}
 			
+			private function ping():void {
+				var id:String = UIDUtil.createUID();
+				pings[id] = new Date();
+				var payload:ByteArray = new ByteArray();
+				payload.writeMultiByte(id, 'utf-8');
+				websocket.ping(payload);
+			}
+			
+			private function handlePong(event:WebSocketEvent):void {
+				if (event.frame.length > 0) {
+					var id:String = event.frame.binaryPayload.readMultiByte(event.frame.length, 'utf-8');
+					var startTime:Date = pings[id];
+					if (startTime) {
+						var latency:uint = (new Date()).valueOf() - startTime.valueOf();
+						WebSocket.logger("Ping latency " + latency + " ms");
+						delete pings[id];
+					}
+				}
+				else {
+					WebSocket.logger("Unsolicited pong received");
+				}
+			}
+			
 			private function clearCanvas():void {
 				if (websocket.connected && websocket.protocol === 'lws-mirror-protocol') {
 					websocket.sendUTF('clear;');
@@ -237,6 +268,7 @@
 				  paddingLeft="5" paddingRight="5" paddingTop="5" paddingBottom="5">
 			<s:Button id="disconnectButton" enabled="false" label="Disconnect" click="closeConnection();" />
 			<s:Button id="connectButton" label="Connect" click="openConnection();" />
+			<s:Button id="pingButton" label="Ping" click="ping();" enabled="false" />
 		</s:HGroup>
 		
 		<s:VGroup horizontalAlign="center" width="100%">

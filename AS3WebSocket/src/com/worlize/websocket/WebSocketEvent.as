@@ -9,6 +9,8 @@ package com.worlize.websocket
 		public static const CLOSED:String = "closed";
 		public static const MESSAGE:String = "message";
 		public static const FRAME:String = "frame";
+		public static const PING:String = "ping";
+		public static const PONG:String = "pong";
 		
 		public var message:WebSocketMessage;
 		public var frame:WebSocketFrame;
