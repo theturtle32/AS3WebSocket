@@ -241,7 +241,7 @@ package com.worlize.websocket
 			uri = _secure ? "wss://" : "ws://";
 			uri += _host;
 			if ((_secure && _port !== 443) || (!_secure && _port !== 80)) {
-				uri += (":" + _port.toString())
+				uri += (":" + _port.toString());
 			}
 			uri += _resource;
 			return uri;
@@ -874,7 +874,7 @@ package com.worlize.websocket
 			
 			// The connection is validated!!
 			handshakeTimer.stop();
-			handshakeTimer.reset()
+			handshakeTimer.reset();
 			
 			serverHandshakeResponse = null;
 			_readyState = WebSocketState.OPEN;

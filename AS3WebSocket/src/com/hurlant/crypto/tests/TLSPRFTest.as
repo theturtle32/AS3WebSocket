@@ -17,7 +17,7 @@ package com.hurlant.crypto.tests
 		public function TLSPRFTest(h:ITestHarness) {
 			super(h, "TLS-PRF Testing");
 			runTest(testVector, "TLF-PRF Test Vector");
-			h.endTestCase()
+			h.endTestCase();
 		}
 		
 		/**

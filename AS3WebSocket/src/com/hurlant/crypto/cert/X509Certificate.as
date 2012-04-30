@@ -152,7 +152,7 @@ package com.hurlant.crypto.cert {
 					oid = OID.MD5_ALGORITHM;
 					break;
 				default:
-					return null
+					return null;
 			}
 			var data:ByteArray = _obj.signedCertificate_bin;
 			data = hash.hash(data);
