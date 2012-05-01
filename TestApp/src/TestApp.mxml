@@ -16,10 +16,10 @@
 			import com.worlize.websocket.WebSocketMessage;
 			
 			import mx.collections.ArrayCollection;
-			import mx.utils.UIDUtil;
 			
 			private var websocket:WebSocket;
 			
+			private var pingCounter:uint = 0;
 			private var pings:Object = {};
 			
 			[Bindable]
@@ -217,16 +217,16 @@
 			}
 			
 			private function ping():void {
-				var id:String = UIDUtil.createUID();
+				var id:uint = pingCounter++;
 				pings[id] = new Date();
 				var payload:ByteArray = new ByteArray();
-				payload.writeMultiByte(id, 'utf-8');
+				payload.writeUnsignedInt(id);
 				websocket.ping(payload);
 			}
 			
 			private function handlePong(event:WebSocketEvent):void {
-				if (event.frame.length > 0) {
-					var id:String = event.frame.binaryPayload.readMultiByte(event.frame.length, 'utf-8');
+				if (event.frame.length === 4) {
+					var id:uint = event.frame.binaryPayload.readUnsignedInt();
 					var startTime:Date = pings[id];
 					if (startTime) {
 						var latency:uint = (new Date()).valueOf() - startTime.valueOf();

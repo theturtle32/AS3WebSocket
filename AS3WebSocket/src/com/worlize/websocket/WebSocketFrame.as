@@ -188,10 +188,12 @@ package com.worlize.websocket
 			}
 			else if (binaryPayload) {
 				data = binaryPayload;
+				data.endian = Endian.BIG_ENDIAN;
 				data.position = 0;
 				_length = data.length;
 			}
 			else {
+				data = new ByteArray();
 				_length = 0;
 			}
 			
