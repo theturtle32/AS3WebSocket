@@ -17,6 +17,11 @@ The AS3WebSocket directory contains a Flash Builder 4.6 Library Project that con
 The testApp directory contains a Flash Builder 4.6 Air Project that uses the AS3WebSocket library and implements two of the test subprotocols from Andy Green's libwebsockets test server, the dumb-increment-protocol, and the lws-mirror-protocol.  [Click here](http://git.warmcat.com/cgi-bin/cgit/libwebsockets) for more detail about the libwebsockets test server.
 
 
+License
+-------
+This library is released under the Apache License, Version 2.0.
+
+
 Download
 --------
 - The Adobe Air test application and the client library in SWC format are both available under the "Downloads" section above.
