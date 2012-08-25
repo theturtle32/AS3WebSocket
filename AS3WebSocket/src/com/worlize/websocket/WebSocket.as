@@ -680,9 +680,14 @@ package com.worlize.websocket
 		private function sendHandshake():void {
 			serverHandshakeResponse = "";
 			
+			var hostValue:String = host;
+			if ((_secure && _port !== 443) || (!_secure && _port !== 80)) {
+				hostValue += (":" + _port.toString());
+			}
+			
 			var text:String = "";
 			text += "GET " + resource + " HTTP/1.1\r\n";
-			text += "Host: " + host + "\r\n";
+			text += "Host: " + hostValue + "\r\n";
 			text += "Upgrade: websocket\r\n";
 			text += "Connection: Upgrade\r\n";
 			text += "Sec-WebSocket-Key: " + base64nonce + "\r\n";
