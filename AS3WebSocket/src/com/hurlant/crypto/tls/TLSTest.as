@@ -158,11 +158,11 @@ package com.hurlant.crypto.tls {
 			})();
 		}
 		
-		private function testHost(host:String, next:Function):void {
-			if (host==null) return;
+		private function testHost(hostArg:String, next:Function):void {
+			if (hostArg==null) return;
 			var t1:int = getTimer();
 			
-			var host:String = host;
+			var host:String = hostArg;
 			var t:TLSSocket = new TLSSocket;
 			t.connect(host, 4433); 
 			t.writeUTFBytes("GET / HTTP/1.0\nHost: "+host+"\n\n");

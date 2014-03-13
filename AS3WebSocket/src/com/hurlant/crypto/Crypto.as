@@ -81,10 +81,6 @@ package com.hurlant.crypto
 			// split name into an array.
 			var keys:Array = name.split("-");
 			switch (keys[0]) {
-				/**
-				 * "simple" is a special case. It means:
-				 * "If using an IV mode, prepend the IV to the ciphertext"
-				 */
 				case "simple":
 					keys.shift();
 					name = keys.join("-");
