@@ -715,6 +715,9 @@ package com.worlize.websocket
 		}
 		
 		private function failHandshake(message:String = "Unable to complete websocket handshake."):void {
+			if (debug) {
+				logger(message);
+			}
 			_readyState = WebSocketState.CLOSED;
 			if (socket.connected) {
 				socket.close();
