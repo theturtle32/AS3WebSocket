@@ -20,7 +20,7 @@ package com.hurlant.util
 		public static function toArray(hex:String):ByteArray {
 			hex = hex.replace(/\s|:/gm,'');
 			var a:ByteArray = new ByteArray;
-			if (hex.length&1==1) hex="0"+hex;
+			if ((hex.length&1)==1) hex="0"+hex;
 			for (var i:uint=0;i<hex.length;i+=2) {
 				a[i/2] = parseInt(hex.substr(i,2),16);
 			}
