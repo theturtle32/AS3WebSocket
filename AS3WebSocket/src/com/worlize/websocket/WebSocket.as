@@ -20,12 +20,7 @@ package com.worlize.websocket
 	import com.adobe.net.URIEncodingBitmap;
 	import com.adobe.utils.StringUtil;
 	import com.hurlant.crypto.hash.SHA1;
-	import com.hurlant.crypto.tls.TLSConfig;
-	import com.hurlant.crypto.tls.TLSEngine;
-	import com.hurlant.crypto.tls.TLSSecurityParameters;
-	import com.hurlant.crypto.tls.TLSSocket;
 	import com.hurlant.util.Base64;
-	import com.hurlant.util.Hex;
 	
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -35,6 +30,7 @@ package com.worlize.websocket
 	import flash.events.SecurityErrorEvent;
 	import flash.events.TimerEvent;
 	import flash.net.Socket;
+	import flash.net.SecureSocket;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
 	import flash.utils.IDataInput;
@@ -69,7 +65,6 @@ package com.worlize.websocket
 		private var _origin:String;
 		private var _useNullMask:Boolean = false;
 		
-		private var rawSocket:Socket;
 		private var socket:Socket;
 		private var timeout:uint;
 		
@@ -91,9 +86,6 @@ package com.worlize.websocket
 		private var handshakeBytesReceived:int;
 		private var handshakeTimer:Timer;
 		private var handshakeTimeout:int = 10000;
-		
-		private var tlsConfig:TLSConfig;
-		private var tlsSocket:TLSSocket;
 		
 		private var URIpathExcludedBitmap:URIEncodingBitmap =
 			new URIEncodingBitmap(URI.URIpathEscape);
@@ -147,23 +139,13 @@ package com.worlize.websocket
 			handshakeTimer = new Timer(handshakeTimeout, 1);
 			handshakeTimer.addEventListener(TimerEvent.TIMER, handleHandshakeTimer);
 			
-			rawSocket = socket = new Socket();
+			socket = secure ? new SecureSocket() : new Socket();
+			socket.endian = Endian.BIG_ENDIAN;
 			socket.timeout = timeout;
 			
-			if (secure) {
-				tlsConfig = new TLSConfig(TLSEngine.CLIENT,
-										  null, null, null, null, null,
-										  TLSSecurityParameters.PROTOCOL_VERSION);
-				tlsConfig.trustAllCertificates = true;
-				tlsConfig.ignoreCommonNameMismatch = true;
-				socket = tlsSocket = new TLSSocket();
-			}
-			
-			
-			rawSocket.addEventListener(Event.CONNECT, handleSocketConnect);
-			rawSocket.addEventListener(IOErrorEvent.IO_ERROR, handleSocketIOError);
-			rawSocket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSocketSecurityError);
-			
+			socket.addEventListener(Event.CONNECT, handleSocketConnect);
+			socket.addEventListener(IOErrorEvent.IO_ERROR, handleSocketIOError);
+			socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSocketSecurityError);
 			socket.addEventListener(Event.CLOSE, handleSocketClose);			
 			socket.addEventListener(ProgressEvent.SOCKET_DATA, handleSocketData);
 			
@@ -198,7 +180,7 @@ package com.worlize.websocket
 				generateNonce();
 				handshakeBytesReceived = 0;
 				
-				rawSocket.connect(_host, _port);
+				socket.connect(_host, _port);
 				if (debug) {
 					logger("Connecting to " + _host + " on port " + _port);
 				}
@@ -443,13 +425,6 @@ package com.worlize.websocket
 			if (debug) {
 				logger("Socket Connected");
 			}
-			if (secure) {
-				if (debug) {
-					logger("starting SSL/TLS");
-				}
-				tlsSocket.startTLS(rawSocket, _host, tlsConfig);
-			}
-			socket.endian = Endian.BIG_ENDIAN;
 			sendHandshake();
 		}
 		
