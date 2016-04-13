@@ -186,6 +186,13 @@ package com.worlize.websocket
 				}
 			}
 		}
+
+		public function addBinaryChainBuildingCertificate(certificate:ByteArray, trusted:Boolean):void {
+			if(!secure)
+				throw new Error("addBinaryChainBuildingCertificate only available for secure websockets");
+
+			(socket as SecureSocket).addBinaryChainBuildingCertificate(certificate, trusted);
+		}
 		
 		private function parseUrl():void {
 			_host = _uri.authority;
