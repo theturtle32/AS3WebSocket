@@ -20,12 +20,7 @@ package com.worlize.websocket
 	import com.adobe.net.URIEncodingBitmap;
 	import com.adobe.utils.StringUtil;
 	import com.hurlant.crypto.hash.SHA1;
-	import com.hurlant.crypto.tls.TLSConfig;
-	import com.hurlant.crypto.tls.TLSEngine;
-	import com.hurlant.crypto.tls.TLSSecurityParameters;
-	import com.hurlant.crypto.tls.TLSSocket;
 	import com.hurlant.util.Base64;
-	import com.hurlant.util.Hex;
 	
 	import flash.events.Event;
 	import flash.events.EventDispatcher;
@@ -35,6 +30,7 @@ package com.worlize.websocket
 	import flash.events.SecurityErrorEvent;
 	import flash.events.TimerEvent;
 	import flash.net.Socket;
+	import flash.net.SecureSocket;
 	import flash.utils.ByteArray;
 	import flash.utils.Endian;
 	import flash.utils.IDataInput;
@@ -69,7 +65,6 @@ package com.worlize.websocket
 		private var _origin:String;
 		private var _useNullMask:Boolean = false;
 		
-		private var rawSocket:Socket;
 		private var socket:Socket;
 		private var timeout:uint;
 		
@@ -79,6 +74,7 @@ package com.worlize.websocket
 		private var base64nonce:String;
 		private var serverHandshakeResponse:String;
 		private var serverExtensions:Array;
+		private var serverSupportsDeflate:Boolean;
 		private var currentFrame:WebSocketFrame;
 		private var frameQueue:Vector.<WebSocketFrame>;
 		private var fragmentationOpcode:int = 0;
@@ -91,9 +87,6 @@ package com.worlize.websocket
 		private var handshakeBytesReceived:int;
 		private var handshakeTimer:Timer;
 		private var handshakeTimeout:int = 10000;
-		
-		private var tlsConfig:TLSConfig;
-		private var tlsSocket:TLSSocket;
 		
 		private var URIpathExcludedBitmap:URIEncodingBitmap =
 			new URIEncodingBitmap(URI.URIpathEscape);
@@ -147,23 +140,13 @@ package com.worlize.websocket
 			handshakeTimer = new Timer(handshakeTimeout, 1);
 			handshakeTimer.addEventListener(TimerEvent.TIMER, handleHandshakeTimer);
 			
-			rawSocket = socket = new Socket();
+			socket = secure ? new SecureSocket() : new Socket();
+			socket.endian = Endian.BIG_ENDIAN;
 			socket.timeout = timeout;
 			
-			if (secure) {
-				tlsConfig = new TLSConfig(TLSEngine.CLIENT,
-										  null, null, null, null, null,
-										  TLSSecurityParameters.PROTOCOL_VERSION);
-				tlsConfig.trustAllCertificates = true;
-				tlsConfig.ignoreCommonNameMismatch = true;
-				socket = tlsSocket = new TLSSocket();
-			}
-			
-			
-			rawSocket.addEventListener(Event.CONNECT, handleSocketConnect);
-			rawSocket.addEventListener(IOErrorEvent.IO_ERROR, handleSocketIOError);
-			rawSocket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSocketSecurityError);
-			
+			socket.addEventListener(Event.CONNECT, handleSocketConnect);
+			socket.addEventListener(IOErrorEvent.IO_ERROR, handleSocketIOError);
+			socket.addEventListener(SecurityErrorEvent.SECURITY_ERROR, handleSocketSecurityError);
 			socket.addEventListener(Event.CLOSE, handleSocketClose);			
 			socket.addEventListener(ProgressEvent.SOCKET_DATA, handleSocketData);
 			
@@ -198,11 +181,18 @@ package com.worlize.websocket
 				generateNonce();
 				handshakeBytesReceived = 0;
 				
-				rawSocket.connect(_host, _port);
+				socket.connect(_host, _port);
 				if (debug) {
 					logger("Connecting to " + _host + " on port " + _port);
 				}
 			}
+		}
+
+		public function addBinaryChainBuildingCertificate(certificate:ByteArray, trusted:Boolean):void {
+			if(!secure)
+				throw new Error("addBinaryChainBuildingCertificate only available for secure websockets");
+
+			(socket as SecureSocket).addBinaryChainBuildingCertificate(certificate, trusted);
 		}
 		
 		private function parseUrl():void {
@@ -443,13 +433,6 @@ package com.worlize.websocket
 			if (debug) {
 				logger("Socket Connected");
 			}
-			if (secure) {
-				if (debug) {
-					logger("starting SSL/TLS");
-				}
-				tlsSocket.startTLS(rawSocket, _host, tlsConfig);
-			}
-			socket.endian = Endian.BIG_ENDIAN;
 			sendHandshake();
 		}
 		
@@ -486,13 +469,24 @@ package com.worlize.websocket
 				currentFrame = new WebSocketFrame();
 			}
 		}
-		
+
+		private function inflate(data:ByteArray):void {
+			data.position = data.length;
+			data.writeUnsignedInt(65535);	// 00 00 ff ff
+			data[0] = data[0] | 1;			// not sure why flash wants this bit set
+			data.inflate();
+		}
+
 		private function processFrame(frame:WebSocketFrame):void {
 			var event:WebSocketEvent;
 			var i:int;
 			var currentFrame:WebSocketFrame;
-			
-			if (frame.rsv1 || frame.rsv2 || frame.rsv3) {
+
+			if (frame.rsv1 && !serverSupportsDeflate) {
+				drop(WebSocketCloseStatus.PROTOCOL_ERROR,
+					 "Received frame with rsv1 set without permessage-deflate negotiated.");
+			}
+			if (frame.rsv2 || frame.rsv3) {
 				drop(WebSocketCloseStatus.PROTOCOL_ERROR,
 					 "Received frame with reserved bit set without a negotiated extension.");
 				return;
@@ -506,6 +500,8 @@ package com.worlize.websocket
 								event = new WebSocketEvent(WebSocketEvent.MESSAGE);
 								event.message = new WebSocketMessage();
 								event.message.type = WebSocketMessage.TYPE_BINARY;
+								if(frame.rsv1)
+									inflate(frame.binaryPayload)
 								event.message.binaryData = frame.binaryPayload;
 								dispatchEvent(event);
 							}
@@ -529,7 +525,9 @@ package com.worlize.websocket
 								event = new WebSocketEvent(WebSocketEvent.MESSAGE);
 								event.message = new WebSocketMessage();
 								event.message.type = WebSocketMessage.TYPE_UTF8;
-								event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.length, 'utf-8');
+								if(frame.rsv1)
+									inflate(frame.binaryPayload)
+								event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.binaryPayload.length, 'utf-8');
 								dispatchEvent(event);
 							}
 							else {
@@ -592,6 +590,11 @@ package com.worlize.websocket
 								);
 								currentFrame.binaryPayload.clear();
 							}
+
+							// inflate if rsv1 is set in the first frame
+							if(frameQueue[0].rsv1)
+								inflate(binaryData);
+
 							binaryData.position = 0;
 							switch (messageOpcode) {
 								case WebSocketOpcode.BINARY_FRAME:
@@ -700,6 +703,12 @@ package com.worlize.websocket
 				var protosList:String = _protocols.join(", ");
 				text += "Sec-WebSocket-Protocol: " + protosList + "\r\n";
 			}
+
+			// we offer permessage-deflate option and accept compressed data from the server, although
+			// we never send compressed data ourselves. server_no_context_takeover is needed cause
+			// there's no way to make flash's ByteArray.inflate re-use a sliding window
+			text += "Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover\r\n";
+
 			// TODO: Handle Extensions
 			text += "\r\n";
 			
@@ -898,7 +907,12 @@ package com.worlize.websocket
 			if (debug) {
 				logger("Server Extensions: " + serverExtensions.join(' | '));
 			}
-			
+
+			serverSupportsDeflate = false;
+			for each (var ext:String in serverExtensions)
+				if(ext.indexOf('permessage-deflate') != -1)
+					serverSupportsDeflate = true;
+
 			// The connection is validated!!
 			handshakeTimer.stop();
 			handshakeTimer.reset();
