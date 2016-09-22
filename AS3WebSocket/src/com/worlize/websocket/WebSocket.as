@@ -74,6 +74,7 @@ package com.worlize.websocket
 		private var base64nonce:String;
 		private var serverHandshakeResponse:String;
 		private var serverExtensions:Array;
+		private var serverSupportsDeflate:Boolean;
 		private var currentFrame:WebSocketFrame;
 		private var frameQueue:Vector.<WebSocketFrame>;
 		private var fragmentationOpcode:int = 0;
@@ -468,13 +469,24 @@ package com.worlize.websocket
 				currentFrame = new WebSocketFrame();
 			}
 		}
-		
+
+		private function inflate(data:ByteArray):void {
+			data.position = data.length;
+			data.writeUnsignedInt(65535);	// 00 00 ff ff
+			data[0] = data[0] | 1;			// not sure why flash wants this bit set
+			data.inflate();
+		}
+
 		private function processFrame(frame:WebSocketFrame):void {
 			var event:WebSocketEvent;
 			var i:int;
 			var currentFrame:WebSocketFrame;
-			
-			if (frame.rsv1 || frame.rsv2 || frame.rsv3) {
+
+			if (frame.rsv1 && !serverSupportsDeflate) {
+				drop(WebSocketCloseStatus.PROTOCOL_ERROR,
+					 "Received frame with rsv1 set without permessage-deflate negotiated.");
+			}
+			if (frame.rsv2 || frame.rsv3) {
 				drop(WebSocketCloseStatus.PROTOCOL_ERROR,
 					 "Received frame with reserved bit set without a negotiated extension.");
 				return;
@@ -488,6 +500,8 @@ package com.worlize.websocket
 								event = new WebSocketEvent(WebSocketEvent.MESSAGE);
 								event.message = new WebSocketMessage();
 								event.message.type = WebSocketMessage.TYPE_BINARY;
+								if(frame.rsv1)
+									inflate(frame.binaryPayload)
 								event.message.binaryData = frame.binaryPayload;
 								dispatchEvent(event);
 							}
@@ -511,7 +525,9 @@ package com.worlize.websocket
 								event = new WebSocketEvent(WebSocketEvent.MESSAGE);
 								event.message = new WebSocketMessage();
 								event.message.type = WebSocketMessage.TYPE_UTF8;
-								event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.length, 'utf-8');
+								if(frame.rsv1)
+									inflate(frame.binaryPayload)
+								event.message.utf8Data = frame.binaryPayload.readMultiByte(frame.binaryPayload.length, 'utf-8');
 								dispatchEvent(event);
 							}
 							else {
@@ -574,6 +590,11 @@ package com.worlize.websocket
 								);
 								currentFrame.binaryPayload.clear();
 							}
+
+							// inflate if rsv1 is set in the first frame
+							if(frameQueue[0].rsv1)
+								inflate(binaryData);
+
 							binaryData.position = 0;
 							switch (messageOpcode) {
 								case WebSocketOpcode.BINARY_FRAME:
@@ -682,6 +703,12 @@ package com.worlize.websocket
 				var protosList:String = _protocols.join(", ");
 				text += "Sec-WebSocket-Protocol: " + protosList + "\r\n";
 			}
+
+			// we offer permessage-deflate option and accept compressed data from the server, although
+			// we never send compressed data ourselves. server_no_context_takeover is needed cause
+			// there's no way to make flash's ByteArray.inflate re-use a sliding window
+			text += "Sec-WebSocket-Extensions: permessage-deflate; server_no_context_takeover\r\n";
+
 			// TODO: Handle Extensions
 			text += "\r\n";
 			
@@ -880,7 +907,12 @@ package com.worlize.websocket
 			if (debug) {
 				logger("Server Extensions: " + serverExtensions.join(' | '));
 			}
-			
+
+			serverSupportsDeflate = false;
+			for each (var ext:String in serverExtensions)
+				if(ext.indexOf('permessage-deflate') != -1)
+					serverSupportsDeflate = true;
+
 			// The connection is validated!!
 			handshakeTimer.stop();
 			handshakeTimer.reset();
